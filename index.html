@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- title for service coordinator dashboard -->
+  <title>The BMW Store | Service Coordinator Console</title>
+  <!-- stylesheet for layout and theme -->
+  <link rel="stylesheet" href="style.css" />
+  <!-- tesseract ocr library for reading tekion and awp screenshots -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
+  <!-- main logic script -->
+  <script src="app.js" defer></script>
+</head>
+<body class="dark-theme">
+  <!-- top bar with brand accents and quick controls -->
+  <header class="topbar">
+    <div class="brand-group">
+      <div class="m-stripes" aria-hidden="true">
+        <span class="m-blue"></span>
+        <span class="m-navy"></span>
+        <span class="m-red"></span>
+      </div>
+      <div>
+        <h1>The BMW Store &mdash; Service Desk</h1>
+        <p class="subtitle">tekion + awp fast advisor dispatch</p>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <button id="theme-toggle-btn" class="btn btn-secondary" type="button">
+        switch to light mode
+      </button>
+      <button id="manage-advisors-btn" class="btn btn-secondary" type="button">
+        manage advisors &amp; signature
+      </button>
+      <button id="reset-form-btn" class="btn btn-danger" type="button" title="shortcut: alt + r">
+        new call / clear (alt+r)
+      </button>
+    </div>
+  </header>
+
+  <!-- main 3-column call center layout -->
+  <main class="dashboard-grid">
+    <!-- column 1: mode, advisor selection, customer details, service chips -->
+    <section class="panel input-panel">
+      <div class="card">
+        <div class="card-header">
+          <h2>1. email mode &amp; advisor</h2>
+          <span class="badge">step 1</span>
+        </div>
+
+        <!-- mode toggle buttons -->
+        <div class="mode-toggle" role="group" aria-label="email mode selector">
+          <button type="button" class="mode-btn active" data-mode="quote">
+            price quote
+          </button>
+          <button type="button" class="mode-btn" data-mode="status">
+            status update
+          </button>
+          <button type="button" class="mode-btn" data-mode="callback">
+            callback / general
+          </button>
+        </div>
+
+        <!-- quick advisor pills -->
+        <div class="field-group">
+          <label>select service advisor</label>
+          <div id="advisor-pills" class="chip-container"></div>
+          <div class="advisor-manual-row">
+            <input type="text" id="advisor-name-input" placeholder="advisor first name" />
+            <input type="email" id="advisor-email-input" placeholder="advisor@thebmwstore.ca" />
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>2. customer &amp; vehicle (tekion / awp)</h2>
+          <span class="badge">step 2</span>
+        </div>
+
+        <div class="form-grid">
+          <div class="field-group">
+            <label for="customer-name">customer full name</label>
+            <input type="text" id="customer-name" placeholder="e.g. Jane Doe" autocomplete="off" />
+          </div>
+
+          <div class="field-group">
+            <label for="customer-phone">phone number</label>
+            <input type="text" id="customer-phone" placeholder="e.g. 604-555-0199" autocomplete="off" />
+          </div>
+
+          <div class="field-group">
+            <label for="customer-number">tekion customer #</label>
+            <input type="text" id="customer-number" placeholder="e.g. 482910" autocomplete="off" />
+          </div>
+
+          <div class="field-group">
+            <label for="customer-vin">vin (last 7 or full 17)</label>
+            <div class="input-with-action">
+              <input type="text" id="customer-vin" placeholder="e.g. WBA5A7C55FD682910" autocomplete="off" />
+              <button type="button" id="copy-last7-btn" class="btn btn-accent" title="copy last 7 digits for awp lookup">
+                copy last 7
+              </button>
+            </div>
+            <small id="vin-helper-text" class="helper-text">paste full vin or 7 chars for awp</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 id="service-section-title">3. requested services / notes</h2>
+          <span class="badge">step 3</span>
+        </div>
+
+        <!-- quick-click bmw service chips -->
+        <div id="service-chips-wrapper">
+          <label>common bmw services (click to toggle)</label>
+          <div id="service-chips" class="chip-container">
+            <button type="button" class="chip service-chip" data-service="Oil Service">Oil Service</button>
+            <button type="button" class="chip service-chip" data-service="Brake Fluid Flush">Brake Fluid Flush</button>
+            <button type="button" class="chip service-chip" data-service="Cabin Microfilter">Cabin Microfilter</button>
+            <button type="button" class="chip service-chip" data-service="Engine Air Filter">Engine Air Filter</button>
+            <button type="button" class="chip service-chip" data-service="Vehicle Check Inspection">Vehicle Check</button>
+            <button type="button" class="chip service-chip" data-service="Front Brakes (Pads &amp; Rotors)">Front Brakes</button>
+            <button type="button" class="chip service-chip" data-service="Rear Brakes (Pads &amp; Rotors)">Rear Brakes</button>
+            <button type="button" class="chip service-chip" data-service="Four-Wheel Alignment">Alignment</button>
+            <button type="button" class="chip service-chip" data-service="Seasonal Tire Swap">Tire Swap</button>
+            <button type="button" class="chip service-chip" data-service="Spark Plugs Replacement">Spark Plugs</button>
+            <button type="button" class="chip service-chip" data-service="Coolant Flush">Coolant Flush</button>
+            <button type="button" class="chip service-chip" data-service="12V Battery Replacement">Battery</button>
+            <button type="button" class="chip service-chip" data-service="Warning Light / Diagnostics">Diagnostics</button>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label for="custom-notes" id="custom-notes-label">additional service details / request</label>
+          <textarea id="custom-notes" rows="3" placeholder="type extra items, mileage, or status inquiry notes..."></textarea>
+        </div>
+      </div>
+    </section>
+
+    <!-- column 2: screenshot paste zone and ocr parser -->
+    <section class="panel screenshot-panel">
+      <div class="card full-height-card">
+        <div class="card-header">
+          <h2>4. tekion / awp screenshot (ctrl+v)</h2>
+          <span class="badge">ocr auto-fill</span>
+        </div>
+
+        <!-- drop and paste target -->
+        <div id="paste-zone" class="paste-zone" tabindex="0">
+          <div id="paste-placeholder" class="paste-placeholder">
+            <p class="paste-icon">&#128247;</p>
+            <p class="paste-title">press <strong>ctrl + v</strong> anywhere on the page</p>
+            <p class="paste-desc">
+              take a snip with <code>win + shift + s</code> in tekion or awp, then paste it right here.
+            </p>
+            <label for="file-upload-input" class="btn btn-secondary file-label">
+              or choose image file
+            </label>
+            <input type="file" id="file-upload-input" accept="image/*" hidden />
+          </div>
+
+          <div id="screenshot-preview-wrap" class="screenshot-preview-wrap hidden">
+            <img id="screenshot-img" alt="pasted tekion or awp screenshot" />
+          </div>
+        </div>
+
+        <!-- screenshot controls and ocr status -->
+        <div class="screenshot-actions">
+          <button type="button" id="run-ocr-btn" class="btn btn-primary" disabled>
+            scan screenshot &amp; auto-fill fields (ocr)
+          </button>
+          <button type="button" id="clear-screenshot-btn" class="btn btn-secondary" disabled>
+            remove screenshot
+          </button>
+        </div>
+
+        <div id="ocr-status-box" class="ocr-status-box">
+          <span id="ocr-status-text">waiting for screenshot paste...</span>
+        </div>
+
+        <!-- raw text paste parser fallback -->
+        <div class="field-group raw-parser-group">
+          <label for="raw-screen-text">quick text parser (optional: paste copied tekion text here)</label>
+          <div class="input-with-action">
+            <textarea id="raw-screen-text" rows="2" placeholder="paste highlighted text from tekion/awp to extract name, phone, customer #, and vin"></textarea>
+            <button type="button" id="parse-text-btn" class="btn btn-secondary">
+              extract
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- column 3: live email output and 1-click copy buttons -->
+    <section class="panel output-panel">
+      <div class="card full-height-card">
+        <div class="card-header">
+          <h2>5. live email preview &amp; dispatch</h2>
+          <span class="badge">ready to send</span>
+        </div>
+
+        <div class="field-group">
+          <label for="preview-to">to (advisor email)</label>
+          <div class="input-with-action">
+            <input type="text" id="preview-to" readonly placeholder="select an advisor..." />
+            <button type="button" id="copy-email-addr-btn" class="btn btn-secondary">
+              copy email
+            </button>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label for="preview-subject">subject line</label>
+          <div class="input-with-action">
+            <input type="text" id="preview-subject" />
+            <button type="button" id="copy-subject-btn" class="btn btn-accent">
+              copy subject
+            </button>
+          </div>
+        </div>
+
+        <div class="field-group grow-group">
+          <label for="preview-body">email body (editable before copying)</label>
+          <textarea id="preview-body" rows="11"></textarea>
+        </div>
+
+        <!-- primary dispatch action buttons -->
+        <div class="dispatch-buttons">
+          <button type="button" id="copy-rich-email-btn" class="btn btn-primary btn-large">
+            copy rich email + screenshot (paste into outlook)
+          </button>
+          <div class="dispatch-row-secondary">
+            <button type="button" id="copy-plain-body-btn" class="btn btn-secondary">
+              copy text body only
+            </button>
+            <button type="button" id="open-mailto-btn" class="btn btn-secondary">
+              open in email client (mailto:)
+            </button>
+          </div>
+        </div>
+
+        <div id="toast-message" class="toast-message" role="status" aria-live="polite">
+          ready for call.
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- modal for managing saved advisors and signature in localstorage -->
+  <div id="settings-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <div class="modal-card">
+      <div class="card-header">
+        <h2 id="settings-title">advisor directory &amp; sign-off settings</h2>
+        <button type="button" id="close-settings-btn" class="btn btn-secondary">close</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="field-group">
+          <label for="signature-input">custom thank-you sign-off</label>
+          <textarea id="signature-input" rows="3" placeholder="Thank you,\nKerwin\nService Coordinator | The BMW Store"></textarea>
+        </div>
+
+        <hr class="divider" />
+
+        <div class="field-group">
+          <label>saved service advisors (stored locally in your browser)</label>
+          <div id="settings-advisor-list" class="settings-advisor-list"></div>
+
+          <div class="add-advisor-row">
+            <input type="text" id="new-advisor-name" placeholder="advisor name (e.g. Alex)" />
+            <input type="email" id="new-advisor-email" placeholder="alex@thebmwstore.ca" />
+            <button type="button" id="add-advisor-btn" class="btn btn-accent">add advisor</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
