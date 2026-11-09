@@ -526,3 +526,329 @@ function resetCallForm() {
   updateEmailPreview();
   showToast("cleared form for new incoming call.");
 }
+
+// bind all dom event listeners when page finishes loading
+function initializeDashboardEvents() {
+  loadSavedSettings();
+  renderAdvisorPills();
+  renderSettingsAdvisorList();
+
+  const sigInput = document.getElementById("signature-input");
+  if (sigInput) {
+    sigInput.value = appState.signature;
+  }
+
+  // mode toggle buttons (price quote, status update, callback)
+  const modeButtons = document.querySelectorAll(".mode-btn");
+  for (let i = 0; i < modeButtons.length; i++) {
+    modeButtons[i].addEventListener("click", function () {
+      for (let j = 0; j < modeButtons.length; j++) {
+        modeButtons[j].classList.remove("active");
+      }
+      modeButtons[i].classList.add("active");
+      appState.mode = modeButtons[i].getAttribute("data-mode");
+
+      const notesLabel = document.getElementById("custom-notes-label");
+      if (notesLabel) {
+        if (appState.mode === "quote") {
+          notesLabel.textContent = "additional service details / quote notes";
+        } else if (appState.mode === "status") {
+          notesLabel.textContent = "status inquiry details (e.g. dropped off this morning)";
+        } else {
+          notesLabel.textContent = "callback reason / message for advisor";
+        }
+      }
+      updateEmailPreview();
+    });
+  }
+
+  // service chips toggle
+  const serviceButtons = document.querySelectorAll(".service-chip");
+  for (let i = 0; i < serviceButtons.length; i++) {
+    serviceButtons[i].addEventListener("click", function () {
+      const serviceName = serviceButtons[i].getAttribute("data-service");
+      const existingIndex = appState.selectedServices.indexOf(serviceName);
+      if (existingIndex === -1) {
+        appState.selectedServices.push(serviceName);
+        serviceButtons[i].classList.add("active");
+      } else {
+        appState.selectedServices.splice(existingIndex, 1);
+        serviceButtons[i].classList.remove("active");
+      }
+      updateEmailPreview();
+    });
+  }
+
+  // live input listeners for customer and advisor fields
+  const liveFieldIds = [
+    "advisor-name-input",
+    "advisor-email-input",
+    "customer-name",
+    "customer-phone",
+    "customer-number",
+    "customer-vin",
+    "custom-notes"
+  ];
+
+  for (let i = 0; i < liveFieldIds.length; i++) {
+    const inputEl = document.getElementById(liveFieldIds[i]);
+    if (inputEl) {
+      inputEl.addEventListener("input", function () {
+        if (liveFieldIds[i] === "customer-vin") {
+          const last7 = extractLast7Vin(inputEl.value);
+          const helper = document.getElementById("vin-helper-text");
+          if (helper) {
+            if (last7.length > 0) {
+              helper.textContent = "awp last 7 digits: " + last7;
+            } else {
+              helper.textContent = "paste full vin or 7 chars for awp";
+            }
+          }
+        }
+        updateEmailPreview();
+      });
+    }
+  }
+
+  // copy last 7 of vin for awp lookup
+  const copyLast7Btn = document.getElementById("copy-last7-btn");
+  if (copyLast7Btn) {
+    copyLast7Btn.addEventListener("click", async function () {
+      const vinEl = document.getElementById("customer-vin");
+      if (!vinEl || vinEl.value.trim() === "") {
+        showToast("enter a vin first to copy last 7 digits.");
+        return;
+      }
+      const last7 = extractLast7Vin(vinEl.value);
+      await navigator.clipboard.writeText(last7);
+      showToast("copied last 7 vin (" + last7 + ") for awp!");
+    });
+  }
+
+  // global paste listener for snipping tool screenshots (ctrl+v)
+  window.addEventListener("paste", function (event) {
+    if (!event.clipboardData || !event.clipboardData.items) {
+      return;
+    }
+    const items = event.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf("image") !== -1) {
+        const blob = items[i].getAsFile();
+        handleScreenshotBlob(blob);
+        event.preventDefault();
+        return;
+      }
+    }
+  });
+
+  // file input fallback for screenshots
+  const fileUploadInput = document.getElementById("file-upload-input");
+  if (fileUploadInput) {
+    fileUploadInput.addEventListener("change", function (event) {
+      if (event.target.files && event.target.files[0]) {
+        handleScreenshotBlob(event.target.files[0]);
+      }
+    });
+  }
+
+  // ocr and clear screenshot buttons
+  const runOcrBtn = document.getElementById("run-ocr-btn");
+  if (runOcrBtn) {
+    runOcrBtn.addEventListener("click", function () {
+      runScreenshotOcr();
+    });
+  }
+
+  const clearScreenshotBtn = document.getElementById("clear-screenshot-btn");
+  if (clearScreenshotBtn) {
+    clearScreenshotBtn.addEventListener("click", function () {
+      appState.screenshotDataUrl = "";
+      appState.screenshotBlob = null;
+      const imgEl = document.getElementById("screenshot-img");
+      const previewWrap = document.getElementById("screenshot-preview-wrap");
+      const placeholder = document.getElementById("paste-placeholder");
+      const statusText = document.getElementById("ocr-status-text");
+      if (imgEl) {
+        imgEl.src = "";
+      }
+      if (previewWrap) {
+        previewWrap.classList.add("hidden");
+      }
+      if (placeholder) {
+        placeholder.classList.remove("hidden");
+      }
+      if (runOcrBtn) {
+        runOcrBtn.disabled = true;
+      }
+      clearScreenshotBtn.disabled = true;
+      if (statusText) {
+        statusText.textContent = "screenshot removed.";
+      }
+    });
+  }
+
+  // raw text parser button
+  const parseTextBtn = document.getElementById("parse-text-btn");
+  if (parseTextBtn) {
+    parseTextBtn.addEventListener("click", function () {
+      const rawBox = document.getElementById("raw-screen-text");
+      if (rawBox) {
+        parseTekionOrAwpText(rawBox.value);
+      }
+    });
+  }
+
+  // copy email address, subject, rich body, plain body, and mailto
+  const copyEmailAddrBtn = document.getElementById("copy-email-addr-btn");
+  if (copyEmailAddrBtn) {
+    copyEmailAddrBtn.addEventListener("click", async function () {
+      const toEl = document.getElementById("preview-to");
+      if (toEl && toEl.value.trim() !== "") {
+        await navigator.clipboard.writeText(toEl.value.trim());
+        showToast("copied advisor email address.");
+      } else {
+        showToast("select an advisor first.");
+      }
+    });
+  }
+
+  const copySubjectBtn = document.getElementById("copy-subject-btn");
+  if (copySubjectBtn) {
+    copySubjectBtn.addEventListener("click", async function () {
+      const subjEl = document.getElementById("preview-subject");
+      if (subjEl) {
+        await navigator.clipboard.writeText(subjEl.value);
+        showToast("copied subject line to clipboard!");
+      }
+    });
+  }
+
+  const copyRichBtn = document.getElementById("copy-rich-email-btn");
+  if (copyRichBtn) {
+    copyRichBtn.addEventListener("click", function () {
+      copyRichEmailWithScreenshot();
+    });
+  }
+
+  const copyPlainBtn = document.getElementById("copy-plain-body-btn");
+  if (copyPlainBtn) {
+    copyPlainBtn.addEventListener("click", async function () {
+      const bodyEl = document.getElementById("preview-body");
+      if (bodyEl) {
+        await navigator.clipboard.writeText(bodyEl.value);
+        showToast("copied plain email body to clipboard.");
+      }
+    });
+  }
+
+  const openMailtoBtn = document.getElementById("open-mailto-btn");
+  if (openMailtoBtn) {
+    openMailtoBtn.addEventListener("click", function () {
+      const toEl = document.getElementById("preview-to");
+      const subjEl = document.getElementById("preview-subject");
+      const bodyEl = document.getElementById("preview-body");
+
+      let toAddr = "";
+      if (toEl) {
+        toAddr = toEl.value.trim();
+      }
+      let subject = "";
+      if (subjEl) {
+        subject = encodeURIComponent(subjEl.value);
+      }
+      let body = "";
+      if (bodyEl) {
+        body = encodeURIComponent(bodyEl.value);
+      }
+
+      window.location.href = "mailto:" + toAddr + "?subject=" + subject + "&body=" + body;
+      showToast("opened default mail client. press ctrl+v in body if pasting screenshot.");
+    });
+  }
+
+  // theme switcher button
+  const themeToggleBtn = document.getElementById("theme-toggle-btn");
+  if (themeToggleBtn) {
+    themeToggleBtn.addEventListener("click", function () {
+      const isLight = document.body.classList.contains("light-theme");
+      if (isLight) {
+        document.body.classList.remove("light-theme");
+        document.body.classList.add("dark-theme");
+        themeToggleBtn.textContent = "switch to light mode";
+        localStorage.setItem(STORAGE_KEYS.THEME, "dark");
+      } else {
+        document.body.classList.remove("dark-theme");
+        document.body.classList.add("light-theme");
+        themeToggleBtn.textContent = "switch to dark mode";
+        localStorage.setItem(STORAGE_KEYS.THEME, "light");
+      }
+    });
+  }
+
+  // settings modal open and close
+  const manageAdvisorsBtn = document.getElementById("manage-advisors-btn");
+  const closeSettingsBtn = document.getElementById("close-settings-btn");
+  const settingsModal = document.getElementById("settings-modal");
+
+  if (manageAdvisorsBtn && settingsModal) {
+    manageAdvisorsBtn.addEventListener("click", function () {
+      settingsModal.classList.remove("hidden");
+    });
+  }
+
+  if (closeSettingsBtn && settingsModal) {
+    closeSettingsBtn.addEventListener("click", function () {
+      if (sigInput) {
+        appState.signature = sigInput.value;
+      }
+      saveSettingsToStorage();
+      updateEmailPreview();
+      settingsModal.classList.add("hidden");
+      showToast("saved advisor directory and signature settings.");
+    });
+  }
+
+  // add new advisor button in settings
+  const addAdvisorBtn = document.getElementById("add-advisor-btn");
+  if (addAdvisorBtn) {
+    addAdvisorBtn.addEventListener("click", function () {
+      const nameEl = document.getElementById("new-advisor-name");
+      const emailEl = document.getElementById("new-advisor-email");
+      if (!nameEl || !emailEl) {
+        return;
+      }
+      const nameVal = nameEl.value.trim();
+      const emailVal = emailEl.value.trim();
+      if (nameVal === "" || emailVal === "") {
+        showToast("enter both advisor name and email.");
+        return;
+      }
+      appState.advisors.push({ name: nameVal, email: emailVal });
+      nameEl.value = "";
+      emailEl.value = "";
+      saveSettingsToStorage();
+      renderAdvisorPills();
+      renderSettingsAdvisorList();
+      showToast("added advisor " + nameVal + ".");
+    });
+  }
+
+  // reset call button and alt+r keyboard shortcut
+  const resetBtn = document.getElementById("reset-form-btn");
+  if (resetBtn) {
+    resetBtn.addEventListener("click", function () {
+      resetCallForm();
+    });
+  }
+
+  window.addEventListener("keydown", function (event) {
+    if (event.altKey && (event.key === "r" || event.key === "R")) {
+      event.preventDefault();
+      resetCallForm();
+    }
+  });
+
+  updateEmailPreview();
+}
+
+document.addEventListener("DOMContentLoaded", initializeDashboardEvents);
