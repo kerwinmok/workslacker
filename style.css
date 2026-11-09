@@ -1,0 +1,525 @@
+/* color tokens for dark and light modes */
+:root {
+  --bg-main: #0b0f17;
+  --bg-card: #131a26;
+  --bg-input: #0e141f;
+  --border-color: #243044;
+  --text-main: #f0f4f8;
+  --text-muted: #8b9bb4;
+  --bmw-blue: #1c69d4;
+  --bmw-blue-hover: #2d7be5;
+  --bmw-sky: #0066b1;
+  --bmw-navy: #0c2340;
+  --bmw-red: #e22718;
+  --success: #18b26b;
+  --chip-bg: #1a2436;
+  --chip-active: #1c69d4;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* light mode theme variables */
+body.light-theme {
+  --bg-main: #f2f5f9;
+  --bg-card: #ffffff;
+  --bg-input: #f8fafc;
+  --border-color: #d4dce8;
+  --text-main: #111827;
+  --text-muted: #5b6b82;
+  --chip-bg: #e8eef6;
+  --chip-active: #1c69d4;
+  --shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+}
+
+/* base reset */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.4;
+}
+
+/* top header bar */
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1.25rem;
+  background-color: var(--bg-card);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.brand-group {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+/* motorsport inspired accent stripes */
+.m-stripes {
+  display: flex;
+  gap: 3px;
+  height: 30px;
+}
+
+.m-stripes span {
+  width: 6px;
+  height: 100%;
+  border-radius: 2px;
+  transform: skewX(-16deg);
+}
+
+.m-blue {
+  background-color: #0066b1;
+}
+
+.m-navy {
+  background-color: #1c3966;
+}
+
+.m-red {
+  background-color: #e22718;
+}
+
+.topbar h1 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.subtitle {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* 3-column call center grid */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.95fr 1.1fr;
+  gap: 0.9rem;
+  padding: 0.9rem 1.25rem;
+  flex: 1;
+  align-items: stretch;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 0.95rem 1rem;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.full-height-card {
+  flex: 1;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.5rem;
+}
+
+.card-header h2 {
+  font-size: 0.92rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+}
+
+.badge {
+  font-size: 0.7rem;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  background-color: var(--chip-bg);
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+/* mode toggle buttons */
+.mode-toggle {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.45rem;
+}
+
+.mode-btn {
+  padding: 0.55rem 0.4rem;
+  border-radius: 7px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-input);
+  color: var(--text-main);
+  font-weight: 600;
+  font-size: 0.84rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.mode-btn:hover {
+  border-color: var(--bmw-blue);
+}
+
+.mode-btn.active {
+  background-color: var(--bmw-blue);
+  border-color: var(--bmw-blue);
+  color: #ffffff;
+}
+
+/* form inputs */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.32rem;
+}
+
+.grow-group {
+  flex: 1;
+}
+
+.grow-group textarea {
+  flex: 1;
+  min-height: 210px;
+}
+
+label {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+input[type="text"],
+input[type="email"],
+textarea {
+  width: 100%;
+  padding: 0.52rem 0.65rem;
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-main);
+  font-size: 0.88rem;
+  font-family: inherit;
+}
+
+input:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--bmw-blue);
+}
+
+.input-with-action {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.advisor-manual-row {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+}
+
+.helper-text {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* chips for advisors and bmw services */
+.chip-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.38rem;
+}
+
+.chip {
+  padding: 0.36rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background-color: var(--chip-bg);
+  color: var(--text-main);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.chip:hover {
+  border-color: var(--bmw-blue);
+}
+
+.chip.active {
+  background-color: var(--chip-active);
+  border-color: var(--chip-active);
+  color: #ffffff;
+}
+
+/* buttons */
+.btn {
+  padding: 0.5rem 0.78rem;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background-color: var(--bmw-blue);
+  color: #ffffff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--bmw-blue-hover);
+}
+
+.btn-accent {
+  background-color: var(--bmw-sky);
+  color: #ffffff;
+}
+
+.btn-accent:hover:not(:disabled) {
+  background-color: var(--bmw-blue-hover);
+}
+
+.btn-secondary {
+  background-color: var(--chip-bg);
+  color: var(--text-main);
+  border-color: var(--border-color);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--bmw-blue);
+}
+
+.btn-danger {
+  background-color: rgba(226, 39, 24, 0.16);
+  color: #ff6b60;
+  border-color: rgba(226, 39, 24, 0.4);
+}
+
+.btn-danger:hover {
+  background-color: var(--bmw-red);
+  color: #ffffff;
+}
+
+.btn-large {
+  padding: 0.72rem 1rem;
+  font-size: 0.92rem;
+  width: 100%;
+}
+
+/* screenshot paste zone */
+.paste-zone {
+  flex: 1;
+  min-height: 230px;
+  border: 2px dashed var(--border-color);
+  border-radius: 8px;
+  background-color: var(--bg-input);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
+  text-align: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.paste-zone:focus,
+.paste-zone:hover {
+  border-color: var(--bmw-blue);
+}
+
+.paste-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  max-width: 290px;
+}
+
+.paste-icon {
+  font-size: 2rem;
+}
+
+.paste-title {
+  font-size: 0.92rem;
+}
+
+.paste-desc {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.file-label {
+  margin-top: 0.35rem;
+  display: inline-block;
+}
+
+.screenshot-preview-wrap {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.screenshot-preview-wrap img {
+  max-width: 100%;
+  max-height: 290px;
+  border-radius: 6px;
+  object-fit: contain;
+  border: 1px solid var(--border-color);
+}
+
+.screenshot-actions {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 0.5rem;
+}
+
+.ocr-status-box {
+  padding: 0.48rem 0.65rem;
+  border-radius: 6px;
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-color);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+/* output dispatch area */
+.dispatch-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.dispatch-row-secondary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+}
+
+.toast-message {
+  padding: 0.5rem 0.7rem;
+  border-radius: 6px;
+  background-color: var(--bg-input);
+  border-left: 4px solid var(--bmw-blue);
+  font-size: 0.8rem;
+  color: var(--text-main);
+}
+
+/* modal dialog */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.68);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 50;
+}
+
+.modal-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  width: 100%;
+  max-width: 580px;
+  padding: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  box-shadow: var(--shadow);
+}
+
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid var(--border-color);
+}
+
+.settings-advisor-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.advisor-row-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.42rem 0.6rem;
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.84rem;
+}
+
+.add-advisor-row {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr auto;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* responsive fallback for smaller windows */
+@media (max-width: 1180px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
