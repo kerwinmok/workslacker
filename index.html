@@ -3,17 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!-- title for service coordinator dashboard -->
+  <!-- title for my service coordinator dashboard -->
   <title>The BMW Store | Service Coordinator Console</title>
-  <!-- stylesheet for layout and theme -->
+  <!-- my main stylesheet -->
   <link rel="stylesheet" href="style.css" />
-  <!-- tesseract ocr library for reading tekion and awp screenshots -->
+  <!-- tesseract ocr so i can scan my tekion screenshots -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
   <!-- main logic script -->
   <script src="app.js" defer></script>
 </head>
 <body class="dark-theme">
-  <!-- top bar with brand accents and quick controls -->
+  <!-- top bar with bmw stripes and my quick settings -->
   <header class="topbar">
     <div class="brand-group">
       <div class="m-stripes" aria-hidden="true">
@@ -40,9 +40,9 @@
     </div>
   </header>
 
-  <!-- main 3-column call center layout -->
+  <!-- 3-column layout so i don't have to scroll during calls -->
   <main class="dashboard-grid">
-    <!-- column 1: mode, advisor selection, customer details, service chips -->
+    <!-- column 1: email mode, advisor buttons, customer info, and service chips -->
     <section class="panel input-panel">
       <div class="card">
         <div class="card-header">
@@ -50,7 +50,7 @@
           <span class="badge">step 1</span>
         </div>
 
-        <!-- mode toggle buttons -->
+        <!-- toggle between quote, status update, and callback -->
         <div class="mode-toggle" role="group" aria-label="email mode selector">
           <button type="button" class="mode-btn active" data-mode="quote">
             price quote
@@ -63,7 +63,7 @@
           </button>
         </div>
 
-        <!-- quick advisor pills -->
+        <!-- quick advisor pills saved in my browser -->
         <div class="field-group">
           <label>select service advisor</label>
           <div id="advisor-pills" class="chip-container"></div>
@@ -115,7 +115,7 @@
           <span class="badge">step 3</span>
         </div>
 
-        <!-- quick-click bmw service chips -->
+        <!-- common bmw services i can click instead of typing -->
         <div id="service-chips-wrapper">
           <label>common bmw services (click to toggle)</label>
           <div id="service-chips" class="chip-container">
@@ -142,7 +142,7 @@
       </div>
     </section>
 
-    <!-- column 2: screenshot paste zone and ocr parser -->
+    <!-- column 2: where i paste my tekion or awp screenshots -->
     <section class="panel screenshot-panel">
       <div class="card full-height-card">
         <div class="card-header">
@@ -150,7 +150,7 @@
           <span class="badge">ocr auto-fill</span>
         </div>
 
-        <!-- drop and paste target -->
+        <!-- drop and paste box -->
         <div id="paste-zone" class="paste-zone" tabindex="0">
           <div id="paste-placeholder" class="paste-placeholder">
             <p class="paste-icon">&#128247;</p>
@@ -169,7 +169,7 @@
           </div>
         </div>
 
-        <!-- screenshot controls and ocr status -->
+        <!-- buttons to run ocr or clear the image -->
         <div class="screenshot-actions">
           <button type="button" id="run-ocr-btn" class="btn btn-primary" disabled>
             scan screenshot &amp; auto-fill fields (ocr)
@@ -183,7 +183,7 @@
           <span id="ocr-status-text">waiting for screenshot paste...</span>
         </div>
 
-        <!-- raw text paste parser fallback -->
+        <!-- backup text box if i just highlight and copy text from tekion -->
         <div class="field-group raw-parser-group">
           <label for="raw-screen-text">quick text parser (optional: paste copied tekion text here)</label>
           <div class="input-with-action">
@@ -196,7 +196,7 @@
       </div>
     </section>
 
-    <!-- column 3: live email output and 1-click copy buttons -->
+    <!-- column 3: live email output and copy buttons for outlook -->
     <section class="panel output-panel">
       <div class="card full-height-card">
         <div class="card-header">
@@ -229,7 +229,7 @@
           <textarea id="preview-body" rows="11"></textarea>
         </div>
 
-        <!-- primary dispatch action buttons -->
+        <!-- buttons to get everything into outlook fast -->
         <div class="dispatch-buttons">
           <button type="button" id="copy-rich-email-btn" class="btn btn-primary btn-large">
             copy rich email + screenshot (paste into outlook)
@@ -251,7 +251,7 @@
     </section>
   </main>
 
-  <!-- modal for managing saved advisors and signature in localstorage -->
+  <!-- popup modal where i edit my advisor list and sign-off -->
   <div id="settings-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
     <div class="modal-card">
       <div class="card-header">
@@ -268,7 +268,7 @@
         <hr class="divider" />
 
         <div class="field-group">
-          <label>saved service advisors (stored locally in your browser)</label>
+          <label>saved service advisors (stored locally in my browser)</label>
           <div id="settings-advisor-list" class="settings-advisor-list"></div>
 
           <div class="add-advisor-row">

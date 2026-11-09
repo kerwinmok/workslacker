@@ -1,4 +1,4 @@
-/* color tokens for dark and light modes */
+/* my color variables for dark mode (default) */
 :root {
   --bg-main: #0b0f17;
   --bg-card: #131a26;
@@ -17,7 +17,7 @@
   --shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
-/* light mode theme variables */
+/* light mode colors when i want a brighter screen at work */
 body.light-theme {
   --bg-main: #f2f5f9;
   --bg-card: #ffffff;
@@ -30,7 +30,7 @@ body.light-theme {
   --shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
 }
 
-/* base reset */
+/* basic reset */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -47,7 +47,7 @@ body {
   line-height: 1.4;
 }
 
-/* top header bar */
+/* top navigation bar */
 .topbar {
   display: flex;
   justify-content: space-between;
@@ -63,7 +63,7 @@ body {
   gap: 0.9rem;
 }
 
-/* motorsport inspired accent stripes */
+/* little bmw m stripes on the top left */
 .m-stripes {
   display: flex;
   gap: 3px;
@@ -108,7 +108,7 @@ body {
   flex-wrap: wrap;
 }
 
-/* 3-column call center grid */
+/* 3-column grid so everything fits on one monitor */
 .dashboard-grid {
   display: grid;
   grid-template-columns: 1.15fr 0.95fr 1.1fr;
@@ -165,7 +165,7 @@ body {
   font-weight: 600;
 }
 
-/* mode toggle buttons */
+/* buttons for switching email mode */
 .mode-toggle {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -194,7 +194,7 @@ body {
   color: #ffffff;
 }
 
-/* form inputs */
+/* text fields and inputs */
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -260,7 +260,7 @@ textarea:focus {
   color: var(--text-muted);
 }
 
-/* chips for advisors and bmw services */
+/* clickable pills for advisors and services */
 .chip-container {
   display: flex;
   flex-wrap: wrap;
@@ -289,7 +289,7 @@ textarea:focus {
   color: #ffffff;
 }
 
-/* buttons */
+/* general button styles */
 .btn {
   padding: 0.5rem 0.78rem;
   border-radius: 6px;
@@ -351,7 +351,7 @@ textarea:focus {
   width: 100%;
 }
 
-/* screenshot paste zone */
+/* middle box where i paste my screenshot */
 .paste-zone {
   flex: 1;
   min-height: 230px;
@@ -429,7 +429,7 @@ textarea:focus {
   color: var(--text-muted);
 }
 
-/* output dispatch area */
+/* right column email copy buttons */
 .dispatch-buttons {
   display: flex;
   flex-direction: column;
@@ -451,7 +451,7 @@ textarea:focus {
   color: var(--text-main);
 }
 
-/* modal dialog */
+/* popup settings window */
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -517,7 +517,7 @@ textarea:focus {
   display: none !important;
 }
 
-/* responsive fallback for smaller windows */
+/* stack columns if i shrink the browser window */
 @media (max-width: 1180px) {
   .dashboard-grid {
     grid-template-columns: 1fr;

@@ -13,14 +13,14 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
-// standalone java http server demonstrating how a backend talks to the frontend
+// simple java server i wrote to test how a backend connects to my frontend
 public class DealershipBackendServer {
 
-  // in-memory list of advisors (simulating a database table in java)
+  // list of advisors in memory (acting like a small database)
   private static final List<AdvisorRecord> advisorDatabase = new ArrayList<>();
 
   public static void main(String[] args) throws IOException {
-    // seed default service advisors
+    // add some starter advisors
     advisorDatabase.add(new AdvisorRecord("Alex", "alex@thebmwstore.ca"));
     advisorDatabase.add(new AdvisorRecord("Jordan", "jordan@thebmwstore.ca"));
     advisorDatabase.add(new AdvisorRecord("Chris", "chris@thebmwstore.ca"));
@@ -28,13 +28,13 @@ public class DealershipBackendServer {
     int port = 8080;
     HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
 
-    // route 1: serve static frontend files (index.html, style.css, app.js)
+    // route 1: serve my html, css, and js files
     server.createContext("/", new StaticFileHandler());
 
-    // route 2: rest api endpoint to get or add service advisors via json
+    // route 2: json endpoint to get or save advisors
     server.createContext("/api/advisors", new AdvisorsApiHandler());
 
-    // route 3: rest api endpoint to format a price quote email on the server
+    // route 3: json endpoint to build the quote email on the server side
     server.createContext("/api/generate-email", new EmailGeneratorApiHandler());
 
     server.setExecutor(null);
@@ -42,7 +42,7 @@ public class DealershipBackendServer {
     server.start();
   }
 
-  // simple data class for an advisor (like a struct in c)
+  // basic object to hold an advisor's name and email
   static class AdvisorRecord {
     String name;
     String email;
@@ -53,7 +53,7 @@ public class DealershipBackendServer {
     }
   }
 
-  // serves index.html, style.css, and app.js to the browser
+  // sends index.html, style.css, and app.js to my browser when i open localhost:8080
   static class StaticFileHandler implements HttpHandler {
     @Override
     public void handle(HttpExchange exchange) throws IOException {
@@ -90,7 +90,7 @@ public class DealershipBackendServer {
     }
   }
 
-  // handles get /api/advisors and post /api/advisors
+  // handles get and post requests for /api/advisors
   static class AdvisorsApiHandler implements HttpHandler {
     @Override
     public void handle(HttpExchange exchange) throws IOException {
@@ -136,7 +136,7 @@ public class DealershipBackendServer {
     }
   }
 
-  // handles post /api/generate-email and returns formatted subject + body json
+  // takes customer info from a post request and sends back the formatted email json
   static class EmailGeneratorApiHandler implements HttpHandler {
     @Override
     public void handle(HttpExchange exchange) throws IOException {
@@ -176,20 +176,20 @@ public class DealershipBackendServer {
     }
   }
 
-  // helper to allow browser fetch calls from localhost or file
+  // allow browser requests from localhost
   private static void addCorsHeaders(Headers headers) {
     headers.set("Access-Control-Allow-Origin", "*");
     headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     headers.set("Access-Control-Allow-Headers", "Content-Type");
   }
 
-  // helper to read utf-8 string from request stream
+  // read the incoming request body as a string
   private static String readRequestBody(InputStream stream) throws IOException {
     byte[] bytes = stream.readAllBytes();
     return new String(bytes, StandardCharsets.UTF_8);
   }
 
-  // helper to send utf-8 json response
+  // send a json string back to the client
   private static void sendJsonResponse(HttpExchange exchange, int status, String json) throws IOException {
     byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
     exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
@@ -199,7 +199,7 @@ public class DealershipBackendServer {
     }
   }
 
-  // simple string extractor for flat json keys without external libraries
+  // grab a value out of a simple json string without needing external libraries
   private static String extractJsonField(String json, String key) {
     String pattern = "\"" + key + "\"";
     int keyIdx = json.indexOf(pattern);
@@ -221,7 +221,7 @@ public class DealershipBackendServer {
     return json.substring(firstQuote + 1, secondQuote);
   }
 
-  // escape quotes and newlines for valid json output
+  // escape quotes and newlines so the json stays valid
   private static String escapeJson(String input) {
     if (input == null) {
       return "";

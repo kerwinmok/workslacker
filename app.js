@@ -1,11 +1,11 @@
-// storage keys for browser localstorage
+// keys i use to save my settings in browser localstorage
 const STORAGE_KEYS = {
   ADVISORS: "bmw_service_advisors_v1",
   SIGNATURE: "bmw_service_signature_v1",
   THEME: "bmw_service_theme_v1"
 };
 
-// default advisor roster for initial load
+// starter list of advisors before i customize them in settings
 const DEFAULT_ADVISORS = [
   { name: "Alex", email: "alex@thebmwstore.ca" },
   { name: "Jordan", email: "jordan@thebmwstore.ca" },
@@ -13,10 +13,10 @@ const DEFAULT_ADVISORS = [
   { name: "Taylor", email: "taylor@thebmwstore.ca" }
 ];
 
-// default sign-off signature
+// my default email sign-off
 const DEFAULT_SIGNATURE = "Thank you,\nKerwin\nService Coordinator | The BMW Store";
 
-// application runtime state
+// keeps track of what i currently have selected on the screen
 const appState = {
   mode: "quote",
   advisors: [],
@@ -27,7 +27,7 @@ const appState = {
   screenshotBlob: null
 };
 
-// load saved settings from localstorage
+// pull my saved advisors, signature, and theme from localstorage
 function loadSavedSettings() {
   const savedAdvisorsRaw = localStorage.getItem(STORAGE_KEYS.ADVISORS);
   if (savedAdvisorsRaw) {
@@ -58,13 +58,13 @@ function loadSavedSettings() {
   }
 }
 
-// persist advisors and signature to localstorage
+// save my advisor list and signature back to localstorage
 function saveSettingsToStorage() {
   localStorage.setItem(STORAGE_KEYS.ADVISORS, JSON.stringify(appState.advisors));
   localStorage.setItem(STORAGE_KEYS.SIGNATURE, appState.signature);
 }
 
-// show status message in the bottom right toast bar
+// update the little status bar at the bottom right
 function showToast(messageText) {
   const toastEl = document.getElementById("toast-message");
   if (!toastEl) {
@@ -73,7 +73,7 @@ function showToast(messageText) {
   toastEl.textContent = messageText;
 }
 
-// render quick-select advisor buttons on the dashboard
+// build the advisor buttons so i can click one instead of typing their email
 function renderAdvisorPills() {
   const container = document.getElementById("advisor-pills");
   if (!container) {
@@ -109,7 +109,7 @@ function renderAdvisorPills() {
   }
 }
 
-// render advisor list inside the settings modal
+// show my saved advisors inside the settings popup so i can delete or add people
 function renderSettingsAdvisorList() {
   const listEl = document.getElementById("settings-advisor-list");
   if (!listEl) {
@@ -146,7 +146,7 @@ function renderSettingsAdvisorList() {
   }
 }
 
-// build combined service string from selected chips and custom notes
+// combine whatever service chips i clicked with my custom notes box
 function getRequestedServicesText() {
   const customNotesInput = document.getElementById("custom-notes");
   let customText = "";
@@ -172,7 +172,7 @@ function getRequestedServicesText() {
   return combined.join(", ");
 }
 
-// generate email subject and body based on current inputs and mode
+// put together the subject line and email body live as i type
 function updateEmailPreview() {
   const advisorNameEl = document.getElementById("advisor-name-input");
   const advisorEmailEl = document.getElementById("advisor-email-input");
@@ -255,7 +255,7 @@ function updateEmailPreview() {
   }
 }
 
-// extract last 7 characters of the vin for awp search
+// grab just the last 7 characters of the vin so i can paste it into awp
 function extractLast7Vin(rawVin) {
   const cleaned = rawVin.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
   if (cleaned.length <= 7) {
@@ -264,7 +264,7 @@ function extractLast7Vin(rawVin) {
   return cleaned.slice(cleaned.length - 7);
 }
 
-// parse raw text from ocr or pasted tekion text to fill fields
+// pull out the vin, phone, customer #, and name from ocr or pasted tekion text
 function parseTekionOrAwpText(rawText) {
   if (!rawText || rawText.trim() === "") {
     showToast("no text found to parse.");
@@ -273,7 +273,7 @@ function parseTekionOrAwpText(rawText) {
 
   let matchedCount = 0;
 
-  // look for 17-character standard vin (excluding i, o, q)
+  // check for a full 17-character vin first
   const fullVinRegex = /\b([A-HJ-NPR-Z0-9]{17})\b/i;
   const fullVinMatch = rawText.match(fullVinRegex);
   if (fullVinMatch) {
@@ -283,7 +283,7 @@ function parseTekionOrAwpText(rawText) {
       matchedCount = matchedCount + 1;
     }
   } else {
-    // look for labeled vin or last 7 characters
+    // otherwise check if it says vin: followed by at least 7 characters
     const shortVinRegex = /vin\s*[:#-]*\s*([A-Z0-9]{7,17})/i;
     const shortVinMatch = rawText.match(shortVinRegex);
     if (shortVinMatch) {
@@ -295,7 +295,7 @@ function parseTekionOrAwpText(rawText) {
     }
   }
 
-  // look for north american phone number
+  // look for a 10-digit phone number
   const phoneRegex = /(?:\+?1[-.\s]?)?\(?([2-9][0-9]{2})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})/;
   const phoneMatch = rawText.match(phoneRegex);
   if (phoneMatch) {
@@ -307,7 +307,7 @@ function parseTekionOrAwpText(rawText) {
     }
   }
 
-  // look for customer number label in tekion or awp
+  // look for tekion customer number
   const custNumRegex = /(?:customer\s*(?:id|no|num|number|#)|cust\s*#|account\s*#)\s*[:#-]*\s*([0-9]{4,10})/i;
   const custNumMatch = rawText.match(custNumRegex);
   if (custNumMatch) {
@@ -318,7 +318,7 @@ function parseTekionOrAwpText(rawText) {
     }
   }
 
-  // look for customer name label
+  // look for customer name
   const nameRegex = /(?:customer\s*name|client\s*name|name)\s*[:#-]\s*([A-Za-z][A-Za-z\s'-]{2,40})/i;
   const nameMatch = rawText.match(nameRegex);
   if (nameMatch) {
@@ -334,7 +334,7 @@ function parseTekionOrAwpText(rawText) {
   showToast("parsed text and auto-filled " + matchedCount + " field(s).");
 }
 
-// load image blob into preview box
+// show my pasted screenshot in the middle column
 function handleScreenshotBlob(blob) {
   if (!blob) {
     return;
@@ -374,7 +374,7 @@ function handleScreenshotBlob(blob) {
   reader.readAsDataURL(blob);
 }
 
-// run client-side tesseract ocr on the pasted screenshot
+// run tesseract ocr on my screenshot to auto-fill the form
 async function runScreenshotOcr() {
   if (!appState.screenshotDataUrl) {
     showToast("paste a screenshot first before running ocr.");
@@ -420,7 +420,7 @@ async function runScreenshotOcr() {
   }
 }
 
-// escape plain text for safe html clipboard output
+// clean up special characters before building html for the clipboard
 function escapeHtml(rawStr) {
   return rawStr
     .replace(/&/g, "&amp;")
@@ -429,7 +429,7 @@ function escapeHtml(rawStr) {
     .replace(/"/g, "&quot;");
 }
 
-// copy rich html email + embedded screenshot directly to clipboard for outlook paste
+// copy both the email text and the screenshot together so i can ctrl+v once in outlook
 async function copyRichEmailWithScreenshot() {
   const previewBody = document.getElementById("preview-body");
   let plainText = "";
@@ -458,14 +458,14 @@ async function copyRichEmailWithScreenshot() {
       return;
     }
   } catch (err) {
-    // fallback to plain text copy if browser blocks html clipboard item
+    // if the browser blocks html clipboard, fall back to plain text
   }
 
   await navigator.clipboard.writeText(plainText);
   showToast("copied plain text body to clipboard.");
 }
 
-// clear all call inputs for the next phone call
+// wipe the form clean when the next customer calls in
 function resetCallForm() {
   const fieldIds = [
     "customer-name",
@@ -489,7 +489,7 @@ function resetCallForm() {
     serviceButtons[i].classList.remove("active");
   }
 
-  // clear screenshot
+  // clear out the old screenshot
   appState.screenshotDataUrl = "";
   appState.screenshotBlob = null;
   const imgEl = document.getElementById("screenshot-img");
@@ -527,7 +527,7 @@ function resetCallForm() {
   showToast("cleared form for new incoming call.");
 }
 
-// bind all dom event listeners when page finishes loading
+// hook up all the buttons and inputs once the page loads
 function initializeDashboardEvents() {
   loadSavedSettings();
   renderAdvisorPills();
@@ -538,7 +538,7 @@ function initializeDashboardEvents() {
     sigInput.value = appState.signature;
   }
 
-  // mode toggle buttons (price quote, status update, callback)
+  // switching between price quote, status update, and callback
   const modeButtons = document.querySelectorAll(".mode-btn");
   for (let i = 0; i < modeButtons.length; i++) {
     modeButtons[i].addEventListener("click", function () {
@@ -562,7 +562,7 @@ function initializeDashboardEvents() {
     });
   }
 
-  // service chips toggle
+  // clicking on bmw service chips
   const serviceButtons = document.querySelectorAll(".service-chip");
   for (let i = 0; i < serviceButtons.length; i++) {
     serviceButtons[i].addEventListener("click", function () {
@@ -579,7 +579,7 @@ function initializeDashboardEvents() {
     });
   }
 
-  // live input listeners for customer and advisor fields
+  // update the email preview whenever i type in any text box
   const liveFieldIds = [
     "advisor-name-input",
     "advisor-email-input",
@@ -610,7 +610,7 @@ function initializeDashboardEvents() {
     }
   }
 
-  // copy last 7 of vin for awp lookup
+  // button to copy just the last 7 of the vin for awp
   const copyLast7Btn = document.getElementById("copy-last7-btn");
   if (copyLast7Btn) {
     copyLast7Btn.addEventListener("click", async function () {
@@ -625,7 +625,7 @@ function initializeDashboardEvents() {
     });
   }
 
-  // global paste listener for snipping tool screenshots (ctrl+v)
+  // listen for ctrl+v anywhere on the page to grab my snipping tool screenshot
   window.addEventListener("paste", function (event) {
     if (!event.clipboardData || !event.clipboardData.items) {
       return;
@@ -641,7 +641,7 @@ function initializeDashboardEvents() {
     }
   });
 
-  // file input fallback for screenshots
+  // manual image upload if i pick a file instead of pasting
   const fileUploadInput = document.getElementById("file-upload-input");
   if (fileUploadInput) {
     fileUploadInput.addEventListener("change", function (event) {
@@ -651,7 +651,7 @@ function initializeDashboardEvents() {
     });
   }
 
-  // ocr and clear screenshot buttons
+  // ocr scan and remove screenshot buttons
   const runOcrBtn = document.getElementById("run-ocr-btn");
   if (runOcrBtn) {
     runOcrBtn.addEventListener("click", function () {
@@ -687,7 +687,7 @@ function initializeDashboardEvents() {
     });
   }
 
-  // raw text parser button
+  // extract fields from raw copied tekion text
   const parseTextBtn = document.getElementById("parse-text-btn");
   if (parseTextBtn) {
     parseTextBtn.addEventListener("click", function () {
@@ -698,7 +698,7 @@ function initializeDashboardEvents() {
     });
   }
 
-  // copy email address, subject, rich body, plain body, and mailto
+  // buttons for copying advisor email, subject line, body, and opening mailto
   const copyEmailAddrBtn = document.getElementById("copy-email-addr-btn");
   if (copyEmailAddrBtn) {
     copyEmailAddrBtn.addEventListener("click", async function () {
@@ -766,7 +766,7 @@ function initializeDashboardEvents() {
     });
   }
 
-  // theme switcher button
+  // toggle between dark mode and light mode
   const themeToggleBtn = document.getElementById("theme-toggle-btn");
   if (themeToggleBtn) {
     themeToggleBtn.addEventListener("click", function () {
@@ -785,7 +785,7 @@ function initializeDashboardEvents() {
     });
   }
 
-  // settings modal open and close
+  // open and close the advisor settings popup
   const manageAdvisorsBtn = document.getElementById("manage-advisors-btn");
   const closeSettingsBtn = document.getElementById("close-settings-btn");
   const settingsModal = document.getElementById("settings-modal");
@@ -808,7 +808,7 @@ function initializeDashboardEvents() {
     });
   }
 
-  // add new advisor button in settings
+  // add a new advisor to my saved list
   const addAdvisorBtn = document.getElementById("add-advisor-btn");
   if (addAdvisorBtn) {
     addAdvisorBtn.addEventListener("click", function () {
@@ -833,7 +833,7 @@ function initializeDashboardEvents() {
     });
   }
 
-  // reset call button and alt+r keyboard shortcut
+  // reset button and alt+r shortcut for when a new call comes in
   const resetBtn = document.getElementById("reset-form-btn");
   if (resetBtn) {
     resetBtn.addEventListener("click", function () {
