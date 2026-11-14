@@ -635,11 +635,58 @@ function extractAndCleanVin(rawText) {
   return result;
 }
 
+// normalize a variable-length customer # token (3-10 digits, preserves internal dashes, strips #, brackets, spaces)
+function cleanCustomerNumberToken(rawToken) {
+  if (!rawToken) {
+    return "";
+  }
+
+  let cleaned = String(rawToken)
+    .replace(/[#\s()[\],.:]+/g, "")
+    .replace(/[\u2013\u2014]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  if (!/^[0-9]+(?:-[0-9]+)*$/.test(cleaned)) {
+    return "";
+  }
+
+  const digitsOnly = cleaned.replace(/\D/g, "");
+  if (digitsOnly.length < 3 || digitsOnly.length > 10) {
+    return "";
+  }
+
+  return cleaned;
+}
+
+// verify a candidate customer # isn't a standalone 4-digit car model year unless explicitly wrapped or labeled
+function isAcceptableCustomerNumber(rawWithWrapper, explicitContext) {
+  const cleaned = cleanCustomerNumberToken(rawWithWrapper);
+  if (cleaned === "") {
+    return false;
+  }
+
+  const hasMarker = /[#(\[\]]/.test(String(rawWithWrapper));
+  if (!explicitContext && !hasMarker && /^\d{4}$/.test(cleaned)) {
+    const yearNum = parseInt(cleaned, 10);
+    if (yearNum >= 1990 && yearNum <= 2035) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+// reject vehicle labels, street addresses, and crm column headers mistaken for a customer name
+function isNonCustomerNameText(text) {
+  return /\b(ave|avenue|st|street|rd|road|blvd|drive|dr|hwy|suite|unit|apt|bmw|rolls|royce|ghost|phantom|cullinan|spectre|wraith|dawn|mini|cooper|tekion|awp|customer|client|odometer|mileage|km|mi|status|active|inactive|pending|service|appointment|advisor|vin|ro|repair|order|year|model|vehicle|plate|license)\b/i.test(text);
+}
+
 // clean up all-caps names from tekion (e.g. SMITH, JOHN -> John Smith)
 function normalizeCustomerName(rawName) {
   let cleaned = rawName.replace(/\s+/g, " ").trim();
-  // remove trailing punctuation left after stripping customer #
-  cleaned = cleaned.replace(/[\s\-–—,#(:]+$/g, "").replace(/^[\s\-–—,#):]+/g, "").trim();
+  // remove trailing punctuation and brackets left after stripping customer #
+  cleaned = cleaned.replace(/[\s\-–—,#(\[\]:]+$/g, "").replace(/^[\s\-–—,#)\]\]:]+/g, "").trim();
   if (cleaned === "") {
     return "";
   }
@@ -672,7 +719,7 @@ function normalizeCustomerName(rawName) {
   return cleaned;
 }
 
-// separate a 5-6 digit customer number stuck onto the customer's name
+// separate a variable-length customer number (with optional dashes, brackets, or #) attached to the customer's name
 function splitNameAndCustomerNumber(rawInput) {
   const result = {
     name: "",
@@ -682,40 +729,43 @@ function splitNameAndCustomerNumber(rawInput) {
     return result;
   }
 
-  let text = rawInput.replace(/\s+/g, " ").trim();
+  const text = rawInput.replace(/\s+/g, " ").trim();
 
-  // case 1: trailing 5-6 digits (e.g. "John Smith 482910", "John Smith-482910", "John Smith(482910)", "John Smith482910")
-  const trailingMatch = text.match(/^(.*?[A-Za-z])[\s\-–—#(,:]*(\d{5,6})\)?$/);
+  // case 1: trailing customer # (e.g. "John Smith (4829)", "Jane Doe [48-2910]", "SMITH, JOHN - 12345678", "John Smith482910")
+  const trailingMatch = text.match(/^(.*?[A-Za-z])[,\s:\-\u2013\u2014]*([#(\[]*\s*\d+(?:[\-\u2013\u2014]\d+)*\s*[)\]]*)$/);
   if (trailingMatch) {
     const candidateName = trailingMatch[1];
-    const candidateNum = trailingMatch[2];
-    if (/[A-Za-z]{2}/.test(candidateName)) {
+    const rawNum = trailingMatch[2];
+    const cleanNum = cleanCustomerNumberToken(rawNum);
+    if (/[A-Za-z]{2}/.test(candidateName) && !isNonCustomerNameText(candidateName) && isAcceptableCustomerNumber(rawNum, false)) {
       result.name = normalizeCustomerName(candidateName);
-      result.customerNumber = candidateNum;
+      result.customerNumber = cleanNum;
       return result;
     }
   }
 
-  // case 2: leading 5-6 digits (e.g. "482910 John Smith", "#482910 - John Smith")
-  const leadingMatch = text.match(/^[#(]*(\d{5,6})[)\s\-–—,:]+([A-Za-z][A-Za-z\s.,'-]+)$/);
+  // case 2: leading customer # (e.g. "#9821 Alex Brown", "(482910) John Smith", "[48-2910] - Jane Doe")
+  const leadingMatch = text.match(/^([#(\[]*\s*\d+(?:[\-\u2013\u2014]\d+)*\s*[)\]]*)[,\s:\-\u2013\u2014]+([A-Za-z][A-Za-z\s.,'-]+)$/);
   if (leadingMatch) {
-    const candidateNum = leadingMatch[1];
+    const rawNum = leadingMatch[1];
     const candidateName = leadingMatch[2];
-    if (/[A-Za-z]{2}/.test(candidateName)) {
+    const cleanNum = cleanCustomerNumberToken(rawNum);
+    if (/[A-Za-z]{2}/.test(candidateName) && !isNonCustomerNameText(candidateName) && isAcceptableCustomerNumber(rawNum, false)) {
       result.name = normalizeCustomerName(candidateName);
-      result.customerNumber = candidateNum;
+      result.customerNumber = cleanNum;
       return result;
     }
   }
 
-  // case 3: inline "Name 482910 ..." with extra ocr columns/labels afterward on the same line
-  const inlineMatch = text.match(/^([A-Za-z][A-Za-z\s.,'-]{1,40}?)[,\s\-–—#(]+(\d{5,6})(?=\b|[)\s|;,])/);
+  // case 3: inline "Name [482910] | Active" with extra ocr columns/labels afterward on the same line
+  const inlineMatch = text.match(/^([A-Za-z][A-Za-z\s.,'-]{1,40}?)(?:[,\s:\-\u2013\u2014]+|(?=[#(\[]))([#(\[]*\s*\d+(?:[\-\u2013\u2014]\d+)*\s*[)\]]*)(?=$|[\s|;,:])/);
   if (inlineMatch) {
     const candidateName = inlineMatch[1];
-    const candidateNum = inlineMatch[2];
-    if (/[A-Za-z]{2}/.test(candidateName) && !/\b(ave|avenue|st|street|rd|road|blvd|drive|dr|bmw|tekion|awp|customer|client|odometer|mileage|km|status|active|service|appointment)\b/i.test(candidateName)) {
+    const rawNum = inlineMatch[2];
+    const cleanNum = cleanCustomerNumberToken(rawNum);
+    if (/[A-Za-z]{2}/.test(candidateName) && !isNonCustomerNameText(candidateName) && isAcceptableCustomerNumber(rawNum, false)) {
       result.name = normalizeCustomerName(candidateName);
-      result.customerNumber = candidateNum;
+      result.customerNumber = cleanNum;
       return result;
     }
   }
@@ -804,19 +854,19 @@ function parseTekionOrAwpText(rawText) {
     }
   }
 
-  // look for explicit customer number label
-  const custNumRegex = /(?:customer\s*(?:id|no|num|number|#)|cust\s*#|account\s*#)\s*[:#-]*\s*([0-9]{4,10})/i;
-  const custNumMatch = rawText.match(custNumRegex);
-  if (custNumMatch) {
-    foundCustNum = custNumMatch[1];
+  // look for explicit customer number label (allows 3-10 digits, brackets, hyphens, #)
+  const custNumRegex = /(?:customer\s*(?:id|no\.?|num\.?|number|#)|cust\s*(?:id|no\.?|num\.?|number|#)|account\s*(?:id|no\.?|num\.?|number|#)|client\s*(?:id|no\.?|#))[ \t]*[:#=\-\u2013\u2014]*[ \t]*([#(\[]*[ \t]*\d+(?:[\-\u2013\u2014]\d+)*[ \t]*[)\]]*)/i;
+  const custNumMatch = scrubbedText.match(custNumRegex);
+  if (custNumMatch && isAcceptableCustomerNumber(custNumMatch[1], true)) {
+    foundCustNum = cleanCustomerNumberToken(custNumMatch[1]);
   }
 
-  // check labeled customer name first and split out any attached 5-6 digit number
-  const nameRegex = /(?:customer\s*name|client\s*name|customer|client|name)\s*[:#-]\s*([^\r\n]+)/i;
+  // check labeled customer name first and split out any attached variable-length customer #
+  const nameRegex = /(?:customer\s*name|client\s*name|(?:customer|client)(?!\s*(?:id|no|num|number|#))|name)[ \t]*[:#-]+[ \t]*([^\r\n]+)/i;
   const nameMatch = scrubbedText.match(nameRegex);
   if (nameMatch) {
     const splitLabeled = splitNameAndCustomerNumber(nameMatch[1]);
-    if (splitLabeled.name !== "") {
+    if (splitLabeled.name !== "" && !isNonCustomerNameText(splitLabeled.name)) {
       foundName = splitLabeled.name;
     }
     if (splitLabeled.customerNumber !== "" && foundCustNum === "") {
@@ -824,7 +874,7 @@ function parseTekionOrAwpText(rawText) {
     }
   }
 
-  // fallback: scan lines/columns for tekion/awp header format like "John Smith 482910" or "SMITH, JOHN (482910)"
+  // fallback: scan lines/columns for tekion/awp header format like "John Smith (4829)" or "SMITH, JOHN [48-2910]"
   if (foundName === "" || foundCustNum === "") {
     const lines = scrubbedText.split(/\r?\n/);
     for (let i = 0; i < lines.length; i++) {
@@ -857,11 +907,30 @@ function parseTekionOrAwpText(rawText) {
     }
   }
 
-  // fallback: standalone 5-6 digit customer # anywhere if still empty
+  // fallback: check bracketed or #-prefixed customer numbers first, then standalone 3-10 digit tokens
   if (foundCustNum === "") {
-    const looseIdMatch = scrubbedText.match(/\b(\d{5,6})\b/);
-    if (looseIdMatch) {
-      foundCustNum = looseIdMatch[1];
+    const markedIdRegex = /(\(\s*\d+(?:[\-\u2013\u2014]\d+)*\s*\)|\[\s*\d+(?:[\-\u2013\u2014]\d+)*\s*\]|#\s*\d+(?:[\-\u2013\u2014]\d+)*)/g;
+    let markedMatch = markedIdRegex.exec(scrubbedText);
+    while (markedMatch !== null) {
+      if (isAcceptableCustomerNumber(markedMatch[1], false)) {
+        foundCustNum = cleanCustomerNumberToken(markedMatch[1]);
+        break;
+      }
+      markedMatch = markedIdRegex.exec(scrubbedText);
+    }
+  }
+
+  if (foundCustNum === "") {
+    const looseIdRegex = /\b(\d+(?:[\-\u2013\u2014]\d+)*)\b/g;
+    let looseMatch = looseIdRegex.exec(scrubbedText);
+    while (looseMatch !== null) {
+      const trailingTail = scrubbedText.slice(looseMatch.index + looseMatch[0].length, looseMatch.index + looseMatch[0].length + 20);
+      const isMeasurementOrStreet = /^[ \t]*(?:km|mi|miles|ave|avenue|st|street|rd|road|blvd|drive|dr)\b/i.test(trailingTail);
+      if (!isMeasurementOrStreet && isAcceptableCustomerNumber(looseMatch[1], false)) {
+        foundCustNum = cleanCustomerNumberToken(looseMatch[1]);
+        break;
+      }
+      looseMatch = looseIdRegex.exec(scrubbedText);
     }
   }
 
@@ -1235,7 +1304,7 @@ function initializeDashboardEvents() {
     }
   }
 
-  // auto-split 5-6 digit customer # when pasted or typed onto the customer name box
+  // auto-split variable-length customer # when pasted or typed onto the customer name box
   const customerNameInput = document.getElementById("customer-name");
   if (customerNameInput) {
     const splitNameField = function () {
@@ -1253,6 +1322,22 @@ function initializeDashboardEvents() {
     customerNameInput.addEventListener("blur", splitNameField);
     customerNameInput.addEventListener("paste", function () {
       setTimeout(splitNameField, 0);
+    });
+  }
+
+  // clean brackets, spaces, or # pasted directly into the customer # box
+  const customerNumberInput = document.getElementById("customer-number");
+  if (customerNumberInput) {
+    const normalizeCustomerNumberField = function () {
+      const cleaned = cleanCustomerNumberToken(customerNumberInput.value);
+      if (cleaned !== "") {
+        customerNumberInput.value = cleaned;
+        updateEmailPreview();
+      }
+    };
+    customerNumberInput.addEventListener("blur", normalizeCustomerNumberField);
+    customerNumberInput.addEventListener("paste", function () {
+      setTimeout(normalizeCustomerNumberField, 0);
     });
   }
 
