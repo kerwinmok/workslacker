@@ -655,7 +655,7 @@ function parseTekionOrAwpText(rawText) {
         continue;
       }
       // skip lines that look like emails, vins, or phone/street labels
-      if (/@|\bvin\b|\bphone\b|\btel\b|\bcell\b|\bfax\b|\bro\b/i.test(line)) {
+      if (/@|\b(vin|phone|tel|cell|fax|ro|ave|avenue|st|street|rd|road|blvd|drive|dr|way|lane|ln|hwy|suite|unit|apt)\b/i.test(line)) {
         continue;
       }
       if (/\b[A-HJ-NPR-Z0-9]{17}\b/i.test(line)) {
