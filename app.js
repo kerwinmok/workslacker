@@ -264,6 +264,83 @@ function extractLast7Vin(rawVin) {
   return cleaned.slice(cleaned.length - 7);
 }
 
+// clean up all-caps names from tekion (e.g. SMITH, JOHN -> John Smith)
+function normalizeCustomerName(rawName) {
+  let cleaned = rawName.replace(/\s+/g, " ").trim();
+  // remove trailing punctuation left after stripping customer #
+  cleaned = cleaned.replace(/[\s\-–—,#(:]+$/g, "").replace(/^[\s\-–—,#):]+/g, "").trim();
+  if (cleaned === "") {
+    return "";
+  }
+
+  // handle "LAST, FIRST" format
+  const commaParts = cleaned.split(",");
+  if (commaParts.length === 2) {
+    const lastPart = commaParts[0].trim();
+    const firstPart = commaParts[1].trim();
+    if (firstPart !== "" && lastPart !== "") {
+      cleaned = firstPart + " " + lastPart;
+    }
+  }
+
+  // convert pure uppercase or pure lowercase names to title case
+  const isAllUpper = cleaned === cleaned.toUpperCase();
+  const isAllLower = cleaned === cleaned.toLowerCase();
+  if (isAllUpper || isAllLower) {
+    const words = cleaned.split(" ");
+    const titled = [];
+    for (let i = 0; i < words.length; i++) {
+      const word = words[i];
+      if (word.length > 0) {
+        titled.push(word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+      }
+    }
+    return titled.join(" ");
+  }
+
+  return cleaned;
+}
+
+// separate a 5-6 digit customer number stuck onto the customer's name
+function splitNameAndCustomerNumber(rawInput) {
+  const result = {
+    name: "",
+    customerNumber: ""
+  };
+  if (!rawInput || rawInput.trim() === "") {
+    return result;
+  }
+
+  let text = rawInput.replace(/\s+/g, " ").trim();
+
+  // case 1: trailing 5-6 digits (e.g. "John Smith 482910", "John Smith-482910", "John Smith(482910)", "John Smith482910")
+  const trailingMatch = text.match(/^(.*?[A-Za-z])[\s\-–—#(,:]*(\d{5,6})\)?$/);
+  if (trailingMatch) {
+    const candidateName = trailingMatch[1];
+    const candidateNum = trailingMatch[2];
+    if (/[A-Za-z]{2}/.test(candidateName)) {
+      result.name = normalizeCustomerName(candidateName);
+      result.customerNumber = candidateNum;
+      return result;
+    }
+  }
+
+  // case 2: leading 5-6 digits (e.g. "482910 John Smith", "#482910 - John Smith")
+  const leadingMatch = text.match(/^[#(]*(\d{5,6})[)\s\-–—,:]+([A-Za-z].+)$/);
+  if (leadingMatch) {
+    const candidateNum = leadingMatch[1];
+    const candidateName = leadingMatch[2];
+    if (/[A-Za-z]{2}/.test(candidateName)) {
+      result.name = normalizeCustomerName(candidateName);
+      result.customerNumber = candidateNum;
+      return result;
+    }
+  }
+
+  result.name = normalizeCustomerName(text);
+  return result;
+}
+
 // pull out the vin, phone, customer #, and name from ocr or pasted tekion text
 function parseTekionOrAwpText(rawText) {
   if (!rawText || rawText.trim() === "") {
@@ -272,6 +349,8 @@ function parseTekionOrAwpText(rawText) {
   }
 
   let matchedCount = 0;
+  let foundName = "";
+  let foundCustNum = "";
 
   // check for a full 17-character vin first
   const fullVinRegex = /\b([A-HJ-NPR-Z0-9]{17})\b/i;
@@ -307,25 +386,80 @@ function parseTekionOrAwpText(rawText) {
     }
   }
 
-  // look for tekion customer number
+  // look for explicit customer number label
   const custNumRegex = /(?:customer\s*(?:id|no|num|number|#)|cust\s*#|account\s*#)\s*[:#-]*\s*([0-9]{4,10})/i;
   const custNumMatch = rawText.match(custNumRegex);
   if (custNumMatch) {
-    const custInput = document.getElementById("customer-number");
-    if (custInput) {
-      custInput.value = custNumMatch[1];
+    foundCustNum = custNumMatch[1];
+  }
+
+  // check labeled customer name first and split out any trailing 5-6 digit number
+  const nameRegex = /(?:customer\s*name|client\s*name|customer|client|name)\s*[:#-]\s*([^\r\n]+)/i;
+  const nameMatch = rawText.match(nameRegex);
+  if (nameMatch) {
+    const splitLabeled = splitNameAndCustomerNumber(nameMatch[1]);
+    if (splitLabeled.name !== "") {
+      foundName = splitLabeled.name;
+    }
+    if (splitLabeled.customerNumber !== "" && foundCustNum === "") {
+      foundCustNum = splitLabeled.customerNumber;
+    }
+  }
+
+  // fallback: scan each line for tekion/awp header format like "John Smith 482910" or "SMITH, JOHN 482910"
+  if (foundName === "" || foundCustNum === "") {
+    const lines = rawText.split(/\r?\n/);
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line === "") {
+        continue;
+      }
+      // skip lines that look like emails, vins, or phone/street labels
+      if (/@|\bvin\b|\bphone\b|\btel\b|\bcell\b|\bfax\b|\bro\b/i.test(line)) {
+        continue;
+      }
+      if (/\b[A-HJ-NPR-Z0-9]{17}\b/i.test(line)) {
+        continue;
+      }
+      const lineSplit = splitNameAndCustomerNumber(line);
+      if (lineSplit.name !== "" && lineSplit.customerNumber !== "") {
+        const wordCount = lineSplit.name.split(/\s+/).length;
+        if (wordCount >= 1 && wordCount <= 4) {
+          if (foundName === "") {
+            foundName = lineSplit.name;
+          }
+          if (foundCustNum === "") {
+            foundCustNum = lineSplit.customerNumber;
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  // fallback: standalone 5-6 digit customer # anywhere if still empty (avoiding phone numbers/vins)
+  if (foundCustNum === "") {
+    const scrubbed = rawText
+      .replace(/(?:\+?1[-.\s]?)?\(?([2-9][0-9]{2})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})/g, " ")
+      .replace(/\b[A-HJ-NPR-Z0-9]{17}\b/gi, " ");
+    const looseIdMatch = scrubbed.match(/\b(\d{5,6})\b/);
+    if (looseIdMatch) {
+      foundCustNum = looseIdMatch[1];
+    }
+  }
+
+  if (foundName !== "") {
+    const nameInput = document.getElementById("customer-name");
+    if (nameInput) {
+      nameInput.value = foundName;
       matchedCount = matchedCount + 1;
     }
   }
 
-  // look for customer name
-  const nameRegex = /(?:customer\s*name|client\s*name|name)\s*[:#-]\s*([A-Za-z][A-Za-z\s'-]{2,40})/i;
-  const nameMatch = rawText.match(nameRegex);
-  if (nameMatch) {
-    const cleanedName = nameMatch[1].split("\n")[0].trim();
-    const nameInput = document.getElementById("customer-name");
-    if (nameInput) {
-      nameInput.value = cleanedName;
+  if (foundCustNum !== "") {
+    const custInput = document.getElementById("customer-number");
+    if (custInput) {
+      custInput.value = foundCustNum;
       matchedCount = matchedCount + 1;
     }
   }
@@ -608,6 +742,27 @@ function initializeDashboardEvents() {
         updateEmailPreview();
       });
     }
+  }
+
+  // auto-split 5-6 digit customer # when pasted or typed onto the customer name box
+  const customerNameInput = document.getElementById("customer-name");
+  if (customerNameInput) {
+    const splitNameField = function () {
+      const parsed = splitNameAndCustomerNumber(customerNameInput.value);
+      if (parsed.customerNumber !== "") {
+        customerNameInput.value = parsed.name;
+        const custNumEl = document.getElementById("customer-number");
+        if (custNumEl) {
+          custNumEl.value = parsed.customerNumber;
+        }
+        updateEmailPreview();
+        showToast("isolated customer # " + parsed.customerNumber + " from name.");
+      }
+    };
+    customerNameInput.addEventListener("blur", splitNameField);
+    customerNameInput.addEventListener("paste", function () {
+      setTimeout(splitNameField, 0);
+    });
   }
 
   // button to copy just the last 7 of the vin for awp
