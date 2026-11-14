@@ -82,11 +82,15 @@ function setUsbSyncStatus(text) {
   }
 }
 
-// pull my saved advisors, cc list, signature, and theme from localstorage
+// pull my saved advisors, cc list, signature, and theme from usb fallback + localstorage
 function loadSavedSettings() {
-  appState.advisors = DEFAULT_ADVISORS.slice();
-  appState.ccContacts = DEFAULT_CC_LIST.slice();
-  appState.signature = DEFAULT_SIGNATURE;
+  if (window.USB_SAVED_CONFIG) {
+    applyConfigObject(window.USB_SAVED_CONFIG);
+  } else {
+    appState.advisors = DEFAULT_ADVISORS.slice();
+    appState.ccContacts = DEFAULT_CC_LIST.slice();
+    appState.signature = DEFAULT_SIGNATURE;
+  }
 
   const savedAdvisorsRaw = localStorage.getItem(STORAGE_KEYS.ADVISORS);
   if (savedAdvisorsRaw) {
@@ -603,6 +607,38 @@ function splitNameAndCustomerNumber(rawInput) {
   return result;
 }
 
+// format raw, dashed, dotted, or bracketed phone numbers into XXX-XXX-XXXX
+function formatPhoneNumber(rawPhone) {
+  if (!rawPhone) {
+    return "";
+  }
+  let digits = rawPhone.replace(/\D/g, "");
+  if (digits.length === 11 && digits.charAt(0) === "1") {
+    digits = digits.slice(1);
+  }
+  if (digits.length === 10 && digits.charAt(0) >= "2") {
+    return digits.slice(0, 3) + "-" + digits.slice(3, 6) + "-" + digits.slice(6);
+  }
+  return "";
+}
+
+// find the first phone match in pasted or ocr text and return formatted value + raw token
+function extractPhoneFromText(rawText) {
+  const phonePattern = /(?:^|[^0-9A-Za-z])((?:\+?1[-.\s\u2013\u2014]*)?[\[(]?[2-9][0-9]{2}[\])]?[-.\s\u2013\u2014]*[0-9]{3}[-.\s\u2013\u2014]*[0-9]{4})(?![0-9])/;
+  const match = rawText.match(phonePattern);
+  if (!match) {
+    return null;
+  }
+  const formatted = formatPhoneNumber(match[1]);
+  if (formatted === "") {
+    return null;
+  }
+  return {
+    formatted: formatted,
+    rawToken: match[1]
+  };
+}
+
 // pull out the vin, phone, customer #, and name from ocr or pasted tekion text
 function parseTekionOrAwpText(rawText) {
   if (!rawText || rawText.trim() === "") {
@@ -641,14 +677,12 @@ function parseTekionOrAwpText(rawText) {
     }
   }
 
-  // look for a 10-digit phone number
-  const phoneRegex = /(?:\+?1[-.\s]?)?\(?([2-9][0-9]{2})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})/;
-  const phoneMatch = rawText.match(phoneRegex);
-  if (phoneMatch) {
-    const formattedPhone = phoneMatch[1] + "-" + phoneMatch[2] + "-" + phoneMatch[3];
+  // look for a 10-digit phone number (raw digits, dashes, dots, spaces, or brackets)
+  const phoneInfo = extractPhoneFromText(rawText);
+  if (phoneInfo) {
     const phoneInput = document.getElementById("customer-phone");
     if (phoneInput) {
-      phoneInput.value = formattedPhone;
+      phoneInput.value = phoneInfo.formatted;
       matchedCount = matchedCount + 1;
     }
   }
@@ -656,8 +690,8 @@ function parseTekionOrAwpText(rawText) {
   // strip already-detected phones, vins, and emails so they don't confuse name/id matching
   const scrubbedText = rawText
     .replace(/\S+@\S+\.\S+/g, " ")
-    .replace(/(?:\+?1[-.\s]?)?\(?([2-9][0-9]{2})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})/g, " ")
-    .replace(/\b[A-HJ-NPR-Z0-9]{17}\b/gi, " ");
+    .replace(/\b[A-HJ-NPR-Z0-9]{17}\b/gi, " ")
+    .replace(/(?:^|[^0-9A-Za-z])(?:\+?1[-.\s\u2013\u2014]*)?[\[(]?[2-9][0-9]{2}[\])]?[-.\s\u2013\u2014]*[0-9]{3}[-.\s\u2013\u2014]*[0-9]{4}(?![0-9])/g, " ");
 
   // look for explicit customer number label
   const custNumRegex = /(?:customer\s*(?:id|no|num|number|#)|cust\s*#|account\s*#)\s*[:#-]*\s*([0-9]{4,10})/i;
@@ -1111,6 +1145,22 @@ function initializeDashboardEvents() {
     });
   }
 
+  // auto-format raw or bracketed phone numbers typed or pasted into phone box
+  const customerPhoneInput = document.getElementById("customer-phone");
+  if (customerPhoneInput) {
+    const normalizePhoneField = function () {
+      const formatted = formatPhoneNumber(customerPhoneInput.value);
+      if (formatted !== "") {
+        customerPhoneInput.value = formatted;
+        updateEmailPreview();
+      }
+    };
+    customerPhoneInput.addEventListener("blur", normalizePhoneField);
+    customerPhoneInput.addEventListener("paste", function () {
+      setTimeout(normalizePhoneField, 0);
+    });
+  }
+
   // button to copy just the last 7 of the vin for awp
   const copyLast7Btn = document.getElementById("copy-last7-btn");
   if (copyLast7Btn) {
@@ -1384,6 +1434,44 @@ function initializeDashboardEvents() {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       showToast("exported advisors.json config file.");
+    });
+  }
+
+  // save portable advisors-config.js directly to usb for direct file:// index.html fallback
+  const exportJsConfigBtn = document.getElementById("export-js-config-btn");
+  if (exportJsConfigBtn) {
+    exportJsConfigBtn.addEventListener("click", async function () {
+      const jsContent = "// portable usb config loaded directly when double-clicking index.html over file://\r\n" +
+        "window.USB_SAVED_CONFIG = " + JSON.stringify(buildConfigPayload(), null, 2) + ";\r\n";
+
+      if (window.showSaveFilePicker) {
+        try {
+          const handle = await window.showSaveFilePicker({
+            suggestedName: "advisors-config.js",
+            types: [{ description: "JavaScript Config", accept: { "application/javascript": [".js"] } }]
+          });
+          const writable = await handle.createWritable();
+          await writable.write(jsContent);
+          await writable.close();
+          showToast("saved advisors-config.js directly!");
+          return;
+        } catch (err) {
+          if (err && err.name === "AbortError") {
+            return;
+          }
+        }
+      }
+
+      const blob = new Blob([jsContent], { type: "application/javascript" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "advisors-config.js";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      showToast("downloaded advisors-config.js — copy it to your usb folder.");
     });
   }
 
