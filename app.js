@@ -518,6 +518,123 @@ function extractLast7Vin(rawVin) {
   return cleaned.slice(cleaned.length - 7);
 }
 
+// clean up a vin candidate and fix common ocr lookalikes (O/Q -> 0, I -> 1)
+function normalizeVinCandidate(rawToken, allowShort) {
+  if (!rawToken) {
+    return "";
+  }
+
+  const compact = String(rawToken).replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  if (compact.length === 0) {
+    return "";
+  }
+
+  const rawDigitMatches = compact.match(/[0-9]/g);
+  let rawDigitCount = 0;
+  if (rawDigitMatches) {
+    rawDigitCount = rawDigitMatches.length;
+  }
+
+  // iso 3779 vins never use I, O, or Q, so map those ocr mistakes back to digits when digits exist
+  let fixed = compact;
+  if (rawDigitCount >= 1) {
+    fixed = compact.replace(/[OQ]/g, "0").replace(/I/g, "1");
+  }
+
+  const fixedDigitMatches = fixed.match(/[0-9]/g);
+  let fixedDigitCount = 0;
+  if (fixedDigitMatches) {
+    fixedDigitCount = fixedDigitMatches.length;
+  }
+
+  if (fixed.length === 17) {
+    if (/^[A-HJ-NPR-Z0-9]{17}$/.test(fixed) && rawDigitCount >= 1 && fixedDigitCount >= 3) {
+      return fixed;
+    }
+    return "";
+  }
+
+  if (allowShort && fixed.length >= 7 && fixed.length < 17) {
+    if (/^[A-HJ-NPR-Z0-9]{7,16}$/.test(fixed) && rawDigitCount >= 2 && fixedDigitCount >= 3) {
+      return fixed;
+    }
+  }
+
+  return "";
+}
+
+// extract a bmw or rolls-royce (or general 17-char / labeled 7-char) vin from ocr text
+function extractAndCleanVin(rawText) {
+  const result = {
+    vin: "",
+    matchedTokens: []
+  };
+  if (!rawText || rawText.trim() === "") {
+    return result;
+  }
+
+  const knownPrefixes = ["WBA", "WBS", "WBY", "WBW", "WMW", "5UX", "5YM", "3MW", "4US", "SCA", "SBA"];
+  let fallback17 = "";
+  let labeledShort = "";
+
+  // check explicit vin labels first (supports hyphenated vins and 7-char awp short vins)
+  const labeledRegex = /\bvin\s*(?:no\.?|num\.?|number|#)?\s*[:#=\-\u2013\u2014]*\s*([A-Z0-9]{3,}(?:[-][A-Z0-9]{2,})*)/gi;
+  let labeledMatch = labeledRegex.exec(rawText);
+  while (labeledMatch !== null) {
+    const rawCandidate = labeledMatch[1];
+    const clean17 = normalizeVinCandidate(rawCandidate, false);
+    if (clean17 !== "") {
+      result.matchedTokens.push(rawCandidate);
+      const prefix = clean17.slice(0, 3);
+      if (knownPrefixes.indexOf(prefix) !== -1) {
+        result.vin = clean17;
+        return result;
+      }
+      if (fallback17 === "") {
+        fallback17 = clean17;
+      }
+    } else {
+      const cleanShort = normalizeVinCandidate(rawCandidate, true);
+      if (cleanShort !== "" && labeledShort === "") {
+        result.matchedTokens.push(rawCandidate);
+        labeledShort = cleanShort;
+      }
+    }
+    labeledMatch = labeledRegex.exec(rawText);
+  }
+
+  // scan all standalone 17-character alphanumeric tokens (including ocr I/O/Q mistakes)
+  const tokenRegex = /\b([A-Za-z0-9]{17})\b/g;
+  let tokenMatch = tokenRegex.exec(rawText);
+  while (tokenMatch !== null) {
+    const rawToken = tokenMatch[1];
+    const cleaned = normalizeVinCandidate(rawToken, false);
+    if (cleaned !== "") {
+      result.matchedTokens.push(rawToken);
+      const prefix = cleaned.slice(0, 3);
+      if (knownPrefixes.indexOf(prefix) !== -1) {
+        result.vin = cleaned;
+        return result;
+      }
+      if (fallback17 === "") {
+        fallback17 = cleaned;
+      }
+    }
+    tokenMatch = tokenRegex.exec(rawText);
+  }
+
+  if (fallback17 !== "") {
+    result.vin = fallback17;
+    return result;
+  }
+
+  if (labeledShort !== "") {
+    result.vin = labeledShort;
+  }
+
+  return result;
+}
+
 // clean up all-caps names from tekion (e.g. SMITH, JOHN -> John Smith)
 function normalizeCustomerName(rawName) {
   let cleaned = rawName.replace(/\s+/g, " ").trim();
@@ -649,21 +766,8 @@ function parseTekionOrAwpText(rawText) {
   let matchedCount = 0;
   let foundName = "";
   let foundCustNum = "";
-  let filledVin = "";
-
-  // check for a full 17-character vin first
-  const fullVinRegex = /\b([A-HJ-NPR-Z0-9]{17})\b/i;
-  const fullVinMatch = rawText.match(fullVinRegex);
-  if (fullVinMatch) {
-    filledVin = fullVinMatch[1].toUpperCase();
-  } else {
-    // otherwise check if it says vin: followed by at least 7 characters
-    const shortVinRegex = /vin\s*[:#-]*\s*([A-Z0-9]{7,17})/i;
-    const shortVinMatch = rawText.match(shortVinRegex);
-    if (shortVinMatch) {
-      filledVin = shortVinMatch[1].toUpperCase();
-    }
-  }
+  const vinInfo = extractAndCleanVin(rawText);
+  const filledVin = vinInfo.vin;
 
   if (filledVin !== "") {
     const vinInput = document.getElementById("customer-vin");
@@ -687,11 +791,18 @@ function parseTekionOrAwpText(rawText) {
     }
   }
 
-  // strip already-detected phones, vins, and emails so they don't confuse name/id matching
-  const scrubbedText = rawText
+  // strip already-detected phones, vins (including ocr-corrected tokens), and emails so they don't confuse name/id matching
+  let scrubbedText = rawText
     .replace(/\S+@\S+\.\S+/g, " ")
     .replace(/\b[A-HJ-NPR-Z0-9]{17}\b/gi, " ")
     .replace(/(?:^|[^0-9A-Za-z])(?:\+?1[-.\s\u2013\u2014]*)?[\[(]?[2-9][0-9]{2}[\])]?[-.\s\u2013\u2014]*[0-9]{3}[-.\s\u2013\u2014]*[0-9]{4}(?![0-9])/g, " ");
+
+  for (let v = 0; v < vinInfo.matchedTokens.length; v++) {
+    const rawVinToken = vinInfo.matchedTokens[v];
+    if (rawVinToken) {
+      scrubbedText = scrubbedText.split(rawVinToken).join(" ");
+    }
+  }
 
   // look for explicit customer number label
   const custNumRegex = /(?:customer\s*(?:id|no|num|number|#)|cust\s*#|account\s*#)\s*[:#-]*\s*([0-9]{4,10})/i;
@@ -1158,6 +1269,26 @@ function initializeDashboardEvents() {
     customerPhoneInput.addEventListener("blur", normalizePhoneField);
     customerPhoneInput.addEventListener("paste", function () {
       setTimeout(normalizePhoneField, 0);
+    });
+  }
+
+  // clean up hyphens/spaces/ocr lookalikes pasted into the vin box
+  const customerVinInput = document.getElementById("customer-vin");
+  if (customerVinInput) {
+    const normalizeVinField = function () {
+      const cleaned = normalizeVinCandidate(customerVinInput.value, true);
+      if (cleaned !== "") {
+        customerVinInput.value = cleaned;
+        const helper = document.getElementById("vin-helper-text");
+        if (helper) {
+          helper.textContent = "awp last 7 digits: " + extractLast7Vin(cleaned);
+        }
+        updateEmailPreview();
+      }
+    };
+    customerVinInput.addEventListener("blur", normalizeVinField);
+    customerVinInput.addEventListener("paste", function () {
+      setTimeout(normalizeVinField, 0);
     });
   }
 
