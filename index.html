@@ -3,19 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!-- title for my service coordinator dashboard -->
-  <title>The BMW Store | Service Coordinator Console</title>
-  <!-- my main stylesheet -->
+  <title>The BMW Store | Service Desk</title>
   <link rel="stylesheet" href="style.css" />
   <!-- tesseract ocr so i can scan my tekion screenshots -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
-  <!-- portable usb config loaded before app.js -->
-  <script src="advisors-config.js"></script>
-  <!-- main logic script -->
   <script src="app.js" defer></script>
 </head>
 <body class="dark-theme">
-  <!-- top bar with bmw stripes and my quick settings -->
   <header class="topbar">
     <div class="brand-group">
       <div class="m-stripes" aria-hidden="true">
@@ -25,79 +19,74 @@
       </div>
       <div>
         <h1>The BMW Store &mdash; Service Desk</h1>
-        <p class="subtitle">tekion + awp fast advisor dispatch</p>
+        <p class="subtitle">paste screenshot &bull; pick advisor &bull; copy email</p>
       </div>
     </div>
 
     <div class="header-actions">
       <button id="theme-toggle-btn" class="btn btn-secondary" type="button">
-        switch to light mode
+        light mode
       </button>
       <button id="manage-advisors-btn" class="btn btn-secondary" type="button">
-        manage advisors &amp; signature
+        advisors &amp; cc
       </button>
       <button id="reset-form-btn" class="btn btn-danger" type="button" title="shortcut: alt + r">
-        new call / clear (alt+r)
+        new call (alt+r)
       </button>
     </div>
   </header>
 
-  <!-- 3-column layout so i don't have to scroll during calls -->
   <main class="dashboard-grid">
-    <!-- column 1: email mode, advisor buttons, customer info, and service chips -->
-    <section class="panel input-panel">
+    <!-- column 1: paste screenshot / text first, then auto-filled customer fields -->
+    <section class="panel">
       <div class="card">
         <div class="card-header">
-          <h2>1. email mode &amp; advisor</h2>
-          <span class="badge">step 1</span>
+          <h2>1. paste screenshot or info (ctrl+v)</h2>
+          <span class="badge">auto-ocr</span>
         </div>
 
-        <!-- toggle between quote, status update, and callback -->
-        <div class="mode-toggle" role="group" aria-label="email mode selector">
-          <button type="button" class="mode-btn active" data-mode="quote">
-            price quote
-          </button>
-          <button type="button" class="mode-btn" data-mode="status">
-            status update
-          </button>
-          <button type="button" class="mode-btn" data-mode="callback">
-            callback / general
-          </button>
-        </div>
+        <div id="paste-zone" class="paste-zone compact-paste" tabindex="0">
+          <div id="paste-placeholder" class="paste-placeholder compact-placeholder">
+            <p class="paste-title">press <strong>ctrl + v</strong> anywhere to paste screenshot or copied text</p>
+            <p class="paste-desc">
+              auto-fills customer name, 5-6 digit #, phone, and vin from tekion / awp.
+            </p>
+            <label for="file-upload-input" class="btn btn-secondary btn-small">
+              choose image file
+            </label>
+            <input type="file" id="file-upload-input" accept="image/*" hidden />
+          </div>
 
-        <!-- quick advisor pills saved on my usb config -->
-        <div class="field-group">
-          <label>select service advisor</label>
-          <div id="advisor-pills" class="chip-container"></div>
-          <div class="advisor-manual-row">
-            <input type="text" id="advisor-name-input" placeholder="advisor first name" />
-            <input type="email" id="advisor-email-input" placeholder="advisor@thebmwstore.ca" />
+          <div id="screenshot-preview-wrap" class="screenshot-preview-wrap hidden">
+            <img id="screenshot-img" alt="pasted tekion or awp screenshot" />
           </div>
         </div>
 
-        <!-- quick cc contacts + manual cc box -->
-        <div class="field-group">
-          <label for="cc-email-input">cc (optional &mdash; click pills or type emails)</label>
-          <div id="cc-pills" class="chip-container"></div>
-          <input type="text" id="cc-email-input" placeholder="cc emails (e.g. dispatch@thebmwstore.ca)" autocomplete="off" />
+        <div class="screenshot-toolbar">
+          <div id="ocr-status-box" class="ocr-status-box">
+            <span id="ocr-status-text">waiting for paste (ctrl+v)...</span>
+          </div>
+          <div class="screenshot-btns">
+            <button type="button" id="run-ocr-btn" class="btn btn-secondary btn-small" disabled>
+              re-scan
+            </button>
+            <button type="button" id="clear-screenshot-btn" class="btn btn-secondary btn-small" disabled>
+              clear
+            </button>
+          </div>
         </div>
       </div>
 
-      <div class="card">
+      <div class="card grow-card">
         <div class="card-header">
-          <h2>2. customer &amp; vehicle (tekion / awp)</h2>
-          <span class="badge">step 2</span>
+          <h2>2. customer &amp; vehicle</h2>
+          <span class="badge">auto-split #</span>
         </div>
 
         <div class="form-grid">
           <div class="field-group">
-            <label for="customer-name">customer first &amp; last name</label>
-            <input type="text" id="customer-name" placeholder="e.g. John Smith (auto-splits 5-6 digit #)" autocomplete="off" />
-          </div>
-
-          <div class="field-group">
-            <label for="customer-phone">phone number</label>
-            <input type="text" id="customer-phone" placeholder="e.g. 604-555-0199" autocomplete="off" />
+            <label for="customer-name">first &amp; last name</label>
+            <input type="text" id="customer-name" placeholder="e.g. John Smith" autocomplete="off" />
           </div>
 
           <div class="field-group">
@@ -106,27 +95,68 @@
           </div>
 
           <div class="field-group">
-            <label for="customer-vin">vin (last 7 or full 17)</label>
+            <label for="customer-phone">phone number</label>
+            <input type="text" id="customer-phone" placeholder="e.g. 604-555-0199" autocomplete="off" />
+          </div>
+
+          <div class="field-group">
+            <label for="customer-vin">vin (full 17 or last 7)</label>
             <div class="input-with-action">
-              <input type="text" id="customer-vin" placeholder="e.g. WBA5A7C55FD682910" autocomplete="off" />
-              <button type="button" id="copy-last7-btn" class="btn btn-accent" title="copy last 7 digits for awp lookup">
-                copy last 7
+              <input type="text" id="customer-vin" placeholder="WBA5A7C55FD682910" autocomplete="off" />
+              <button type="button" id="copy-last7-btn" class="btn btn-accent btn-small" title="copy last 7 for awp">
+                last 7
               </button>
             </div>
             <small id="vin-helper-text" class="helper-text">paste full vin or 7 chars for awp</small>
           </div>
         </div>
       </div>
+    </section>
 
+    <!-- column 2: service advisor, cc, and problem / request -->
+    <section class="panel">
       <div class="card">
         <div class="card-header">
-          <h2 id="service-section-title">3. problem / requested service</h2>
+          <h2>3. advisor &amp; cc</h2>
+          <span class="badge">step 2</span>
+        </div>
+
+        <div class="mode-toggle" role="group" aria-label="email mode selector">
+          <button type="button" class="mode-btn active" data-mode="quote">
+            price quote
+          </button>
+          <button type="button" class="mode-btn" data-mode="status">
+            status update
+          </button>
+          <button type="button" class="mode-btn" data-mode="callback">
+            callback
+          </button>
+        </div>
+
+        <div class="field-group">
+          <label>service advisor</label>
+          <div id="advisor-pills" class="chip-container"></div>
+          <div class="advisor-manual-row">
+            <input type="text" id="advisor-name-input" placeholder="advisor name" />
+            <input type="email" id="advisor-email-input" placeholder="advisor@thebmwstore.ca" />
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label for="cc-email-input">cc (optional)</label>
+          <div id="cc-pills" class="chip-container"></div>
+          <input type="text" id="cc-email-input" placeholder="cc emails (comma separated)" autocomplete="off" />
+        </div>
+      </div>
+
+      <div class="card grow-card">
+        <div class="card-header">
+          <h2>4. problem / requested service</h2>
           <span class="badge">step 3</span>
         </div>
 
-        <!-- common bmw services i can click instead of typing -->
-        <div id="service-chips-wrapper">
-          <label>common bmw services (click to toggle)</label>
+        <div id="service-chips-wrapper" class="field-group">
+          <label>quick bmw services</label>
           <div id="service-chips" class="chip-container">
             <button type="button" class="chip service-chip" data-service="Oil Service">Oil Service</button>
             <button type="button" class="chip service-chip" data-service="Brake Fluid Flush">Brake Fluid Flush</button>
@@ -144,150 +174,97 @@
           </div>
         </div>
 
-        <div class="field-group">
-          <label for="custom-notes" id="custom-notes-label">problem / service request details</label>
-          <textarea id="custom-notes" rows="3" placeholder="describe the customer's problem, mileage, or request notes..."></textarea>
+        <div class="field-group grow-group">
+          <label for="custom-notes" id="custom-notes-label">problem / service notes</label>
+          <textarea id="custom-notes" rows="4" placeholder="type customer's issue, symptoms, mileage, or quote request..."></textarea>
         </div>
       </div>
     </section>
 
-    <!-- column 2: where i paste my tekion or awp screenshots -->
-    <section class="panel screenshot-panel">
+    <!-- column 3: ready-to-send email & one-click copy buttons -->
+    <section class="panel">
       <div class="card full-height-card">
         <div class="card-header">
-          <h2>4. tekion / awp screenshot (ctrl+v)</h2>
-          <span class="badge">auto-ocr</span>
+          <h2>5. ready email &amp; copy</h2>
+          <span class="badge">outlook ready</span>
         </div>
 
-        <!-- drop and paste box -->
-        <div id="paste-zone" class="paste-zone" tabindex="0">
-          <div id="paste-placeholder" class="paste-placeholder">
-            <p class="paste-icon">&#128247;</p>
-            <p class="paste-title">press <strong>ctrl + v</strong> anywhere on the page</p>
-            <p class="paste-desc">
-              take a snip with <code>win + shift + s</code> in tekion or awp and paste here &mdash; auto-scans with ocr and splits out the customer's name, 5-6 digit #, phone, and vin.
-            </p>
-            <label for="file-upload-input" class="btn btn-secondary file-label">
-              or choose image file
-            </label>
-            <input type="file" id="file-upload-input" accept="image/*" hidden />
+        <div class="preview-meta-grid">
+          <div class="field-group">
+            <label for="preview-to">to</label>
+            <div class="input-with-action">
+              <input type="text" id="preview-to" readonly placeholder="select an advisor..." />
+              <button type="button" id="copy-email-addr-btn" class="btn btn-accent btn-small">
+                copy to
+              </button>
+            </div>
           </div>
 
-          <div id="screenshot-preview-wrap" class="screenshot-preview-wrap hidden">
-            <img id="screenshot-img" alt="pasted tekion or awp screenshot" />
+          <div class="field-group">
+            <label for="preview-cc">cc</label>
+            <div class="input-with-action">
+              <input type="text" id="preview-cc" readonly placeholder="no cc selected" />
+              <button type="button" id="copy-cc-btn" class="btn btn-accent btn-small">
+                copy cc
+              </button>
+            </div>
           </div>
-        </div>
 
-        <!-- buttons to run ocr or clear the image -->
-        <div class="screenshot-actions">
-          <button type="button" id="run-ocr-btn" class="btn btn-primary" disabled>
-            re-scan screenshot (ocr)
-          </button>
-          <button type="button" id="clear-screenshot-btn" class="btn btn-secondary" disabled>
-            remove screenshot
-          </button>
-        </div>
-
-        <div id="ocr-status-box" class="ocr-status-box">
-          <span id="ocr-status-text">waiting for screenshot paste (ctrl+v auto-scans)...</span>
-        </div>
-
-        <!-- backup text box if i just highlight and copy text from tekion -->
-        <div class="field-group raw-parser-group">
-          <label for="raw-screen-text">quick text parser (paste copied tekion text or ocr output)</label>
-          <div class="input-with-action">
-            <textarea id="raw-screen-text" rows="2" placeholder="paste copied text from tekion/awp to isolate name, 5-6 digit #, phone, and vin"></textarea>
-            <button type="button" id="parse-text-btn" class="btn btn-secondary">
-              extract
-            </button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- column 3: live email output and quick copy buttons for outlook -->
-    <section class="panel output-panel">
-      <div class="card full-height-card">
-        <div class="card-header">
-          <h2>5. live email preview &amp; outlook copy</h2>
-          <span class="badge">ready to send</span>
-        </div>
-
-        <div class="field-group">
-          <label for="preview-to">to (advisor email)</label>
-          <div class="input-with-action">
-            <input type="text" id="preview-to" readonly placeholder="select an advisor..." />
-            <button type="button" id="copy-email-addr-btn" class="btn btn-accent">
-              copy to
-            </button>
-          </div>
-        </div>
-
-        <div class="field-group">
-          <label for="preview-cc">cc (carbon copy)</label>
-          <div class="input-with-action">
-            <input type="text" id="preview-cc" readonly placeholder="optional cc emails..." />
-            <button type="button" id="copy-cc-btn" class="btn btn-accent">
-              copy cc
-            </button>
-          </div>
-        </div>
-
-        <div class="field-group">
-          <label for="preview-subject">subject line</label>
-          <div class="input-with-action">
-            <input type="text" id="preview-subject" />
-            <button type="button" id="copy-subject-btn" class="btn btn-accent">
-              copy subject
-            </button>
+          <div class="field-group">
+            <label for="preview-subject">subject</label>
+            <div class="input-with-action">
+              <input type="text" id="preview-subject" />
+              <button type="button" id="copy-subject-btn" class="btn btn-accent btn-small">
+                copy subject
+              </button>
+            </div>
           </div>
         </div>
 
         <div class="field-group grow-group">
-          <label for="preview-body">email body (editable before copying)</label>
+          <label for="preview-body">email body (editable)</label>
           <textarea id="preview-body" rows="10"></textarea>
         </div>
 
-        <!-- buttons to get everything into outlook fast -->
         <div class="dispatch-buttons">
           <div class="dispatch-row-secondary">
             <button type="button" id="copy-plain-body-btn" class="btn btn-primary btn-large">
-              copy text body
+              copy email body
             </button>
             <button type="button" id="copy-rich-email-btn" class="btn btn-accent btn-large">
               copy body + screenshot
             </button>
           </div>
           <button type="button" id="open-mailto-btn" class="btn btn-secondary">
-            open in email client (mailto: with to &amp; cc)
+            open in email client (mailto:)
           </button>
         </div>
 
         <div id="toast-message" class="toast-message" role="status" aria-live="polite">
-          ready for call.
+          ready for paste or call.
         </div>
       </div>
     </section>
   </main>
 
-  <!-- popup modal where i edit my advisor list and sign-off -->
+  <!-- popup modal where i edit my advisor list, cc presets, and sign-off -->
   <div id="settings-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
     <div class="modal-card">
       <div class="card-header">
-        <h2 id="settings-title">advisor directory &amp; sign-off settings</h2>
+        <h2 id="settings-title">advisors, cc &amp; signature settings</h2>
         <button type="button" id="close-settings-btn" class="btn btn-secondary">close</button>
       </div>
 
       <div class="modal-body">
         <div class="field-group">
-          <label for="signature-input">custom thank-you sign-off</label>
+          <label for="signature-input">thank-you sign-off</label>
           <textarea id="signature-input" rows="3" placeholder="Thank you,\nKerwin\nService Coordinator | The BMW Store"></textarea>
         </div>
 
         <hr class="divider" />
 
         <div class="field-group">
-          <label>saved service advisors (synced to usb advisors.json + browser)</label>
+          <label>saved service advisors (advisors.json)</label>
           <div id="settings-advisor-list" class="settings-advisor-list"></div>
 
           <div class="add-advisor-row">
@@ -300,7 +277,7 @@
         <hr class="divider" />
 
         <div class="field-group">
-          <label>saved quick cc contacts (synced to usb advisors.json + browser)</label>
+          <label>saved quick cc contacts (advisors.json)</label>
           <div id="settings-cc-list" class="settings-advisor-list"></div>
 
           <div class="add-advisor-row">
@@ -313,17 +290,17 @@
         <hr class="divider" />
 
         <div class="field-group">
-          <label>portable usb backup (advisors.json)</label>
+          <label>portable backup (advisors.json)</label>
           <div class="settings-config-actions">
             <button type="button" id="export-config-btn" class="btn btn-secondary">
-              export config (advisors.json)
+              export advisors.json
             </button>
             <label for="import-config-input" class="btn btn-secondary file-label-inline">
-              import config (.json)
+              import advisors.json
             </label>
             <input type="file" id="import-config-input" accept=".json,application/json" hidden />
           </div>
-          <small id="usb-sync-status" class="helper-text">saving changes updates both browser storage and usb config when launched via usb launcher.</small>
+          <small id="usb-sync-status" class="helper-text">saving changes updates advisors.json when launched via workslacker.bat.</small>
         </div>
       </div>
     </div>
