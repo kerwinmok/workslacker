@@ -162,7 +162,11 @@ function Save-PortableConfig {
   $parsed = $JsonPayload | ConvertFrom-Json
   $cleanJson = $parsed | ConvertTo-Json -Depth 10
   $jsonPath = Join-Path $usbRoot "advisors.json"
+  $jsPath = Join-Path $usbRoot "advisors-config.js"
   [System.IO.File]::WriteAllText($jsonPath, $cleanJson + "`r`n", $utf8NoBom)
+  $jsBody = "// portable usb config loaded directly when double-clicking index.html over file://`r`n" +
+    "window.USB_SAVED_CONFIG = " + $cleanJson + ";`r`n"
+  [System.IO.File]::WriteAllText($jsPath, $jsBody, $utf8NoBom)
 }
 
 function Read-HttpRequest {
