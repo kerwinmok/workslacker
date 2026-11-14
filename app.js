@@ -36,17 +36,70 @@ const appState = {
   screenshotBlob: null
 };
 
-// pull my saved advisors, cc list, signature, and theme from storage
+// check whether we are running from the local usb server
+function isLocalUsbServer() {
+  if (window.location.protocol !== "http:" && window.location.protocol !== "https:") {
+    return false;
+  }
+  const host = window.location.hostname;
+  if (host === "127.0.0.1" || host === "localhost") {
+    return true;
+  }
+  return false;
+}
+
+// build a single portable config payload for localstorage, usb json, and export
+function buildConfigPayload() {
+  return {
+    advisors: appState.advisors,
+    ccList: appState.ccContacts,
+    signature: appState.signature
+  };
+}
+
+// apply a parsed config object onto appState safely
+function applyConfigObject(cfg) {
+  if (!cfg || typeof cfg !== "object") {
+    return false;
+  }
+  if (Array.isArray(cfg.advisors)) {
+    appState.advisors = cfg.advisors;
+  }
+  if (Array.isArray(cfg.ccList)) {
+    appState.ccContacts = cfg.ccList;
+  }
+  if (typeof cfg.signature === "string" && cfg.signature.trim() !== "") {
+    appState.signature = cfg.signature;
+  }
+  return true;
+}
+
+// update usb sync note inside the settings popup
+function setUsbSyncStatus(text) {
+  const statusEl = document.getElementById("usb-sync-status");
+  if (statusEl) {
+    statusEl.textContent = text;
+  }
+}
+
+// pull my saved advisors, cc list, signature, and theme from usb config + storage
 function loadSavedSettings() {
+  // start with portable usb config fallback if bundled via advisors-config.js
+  if (window.USB_SAVED_CONFIG) {
+    applyConfigObject(window.USB_SAVED_CONFIG);
+  } else {
+    appState.advisors = DEFAULT_ADVISORS.slice();
+    appState.ccContacts = DEFAULT_CC_LIST.slice();
+    appState.signature = DEFAULT_SIGNATURE;
+  }
+
   const savedAdvisorsRaw = localStorage.getItem(STORAGE_KEYS.ADVISORS);
   if (savedAdvisorsRaw) {
     try {
       appState.advisors = JSON.parse(savedAdvisorsRaw);
     } catch (err) {
-      appState.advisors = DEFAULT_ADVISORS.slice();
+      // keep usb or default list
     }
-  } else {
-    appState.advisors = DEFAULT_ADVISORS.slice();
   }
 
   const savedCcRaw = localStorage.getItem(STORAGE_KEYS.CC_LIST);
@@ -54,17 +107,13 @@ function loadSavedSettings() {
     try {
       appState.ccContacts = JSON.parse(savedCcRaw);
     } catch (err) {
-      appState.ccContacts = DEFAULT_CC_LIST.slice();
+      // keep usb or default list
     }
-  } else {
-    appState.ccContacts = DEFAULT_CC_LIST.slice();
   }
 
   const savedSignature = localStorage.getItem(STORAGE_KEYS.SIGNATURE);
   if (savedSignature !== null && savedSignature.trim() !== "") {
     appState.signature = savedSignature;
-  } else {
-    appState.signature = DEFAULT_SIGNATURE;
   }
 
   const savedTheme = localStorage.getItem(STORAGE_KEYS.THEME);
@@ -78,11 +127,67 @@ function loadSavedSettings() {
   }
 }
 
-// save my advisor list, cc list, and signature back to localstorage
+// pull the latest advisors.json from my local usb server so changes carry across pcs
+async function syncConfigFromUsbServer() {
+  if (!isLocalUsbServer()) {
+    setUsbSyncStatus("running offline / browser mode — changes save in browser storage (use export below for usb backup).");
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/config", { cache: "no-store" });
+    if (!response.ok) {
+      return;
+    }
+    const cfg = await response.json();
+    if (applyConfigObject(cfg)) {
+      localStorage.setItem(STORAGE_KEYS.ADVISORS, JSON.stringify(appState.advisors));
+      localStorage.setItem(STORAGE_KEYS.CC_LIST, JSON.stringify(appState.ccContacts));
+      localStorage.setItem(STORAGE_KEYS.SIGNATURE, appState.signature);
+
+      const sigInput = document.getElementById("signature-input");
+      if (sigInput) {
+        sigInput.value = appState.signature;
+      }
+      renderAdvisorPills();
+      renderSettingsAdvisorList();
+      renderCcPills();
+      renderSettingsCcList();
+      updateEmailPreview();
+      setUsbSyncStatus("connected to usb drive — advisors and cc presets auto-sync to advisors.json.");
+    }
+  } catch (err) {
+    setUsbSyncStatus("could not reach local usb server — using browser storage.");
+  }
+}
+
+// write config changes back to the usb drive when launched via usb launcher
+async function syncConfigToUsbServer() {
+  if (!isLocalUsbServer()) {
+    return;
+  }
+  try {
+    const response = await fetch("/api/config", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(buildConfigPayload())
+    });
+    if (response.ok) {
+      setUsbSyncStatus("saved to usb advisors.json and browser storage.");
+    }
+  } catch (err) {
+    setUsbSyncStatus("usb file write failed — saved in browser storage.");
+  }
+}
+
+// save my advisor list, cc list, and signature to both browser storage and usb config
 function saveSettingsToStorage() {
   localStorage.setItem(STORAGE_KEYS.ADVISORS, JSON.stringify(appState.advisors));
   localStorage.setItem(STORAGE_KEYS.CC_LIST, JSON.stringify(appState.ccContacts));
   localStorage.setItem(STORAGE_KEYS.SIGNATURE, appState.signature);
+  syncConfigToUsbServer();
 }
 
 // update the little status bar at the bottom right
@@ -1265,6 +1370,57 @@ function initializeDashboardEvents() {
     });
   }
 
+  // export portable advisors.json backup file
+  const exportConfigBtn = document.getElementById("export-config-btn");
+  if (exportConfigBtn) {
+    exportConfigBtn.addEventListener("click", function () {
+      const payload = JSON.stringify(buildConfigPayload(), null, 2);
+      const blob = new Blob([payload], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "advisors.json";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      showToast("exported advisors.json config file.");
+    });
+  }
+
+  // import portable advisors.json backup file
+  const importConfigInput = document.getElementById("import-config-input");
+  if (importConfigInput) {
+    importConfigInput.addEventListener("change", function (event) {
+      if (!event.target.files || !event.target.files[0]) {
+        return;
+      }
+      const file = event.target.files[0];
+      const reader = new FileReader();
+      reader.onload = function (loadEvent) {
+        try {
+          const parsed = JSON.parse(loadEvent.target.result);
+          if (applyConfigObject(parsed)) {
+            if (sigInput) {
+              sigInput.value = appState.signature;
+            }
+            saveSettingsToStorage();
+            renderAdvisorPills();
+            renderSettingsAdvisorList();
+            renderCcPills();
+            renderSettingsCcList();
+            updateEmailPreview();
+            showToast("imported portable config successfully.");
+          }
+        } catch (err) {
+          showToast("could not parse json config file.");
+        }
+        importConfigInput.value = "";
+      };
+      reader.readAsText(file);
+    });
+  }
+
   // reset button and alt+r shortcut for when a new call comes in
   const resetBtn = document.getElementById("reset-form-btn");
   if (resetBtn) {
@@ -1281,6 +1437,7 @@ function initializeDashboardEvents() {
   });
 
   updateEmailPreview();
+  syncConfigFromUsbServer();
 }
 
 document.addEventListener("DOMContentLoaded", initializeDashboardEvents);
