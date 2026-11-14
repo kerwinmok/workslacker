@@ -65,7 +65,7 @@
           </button>
         </div>
 
-        <!-- quick advisor pills saved in my browser -->
+        <!-- quick advisor pills saved on my usb config -->
         <div class="field-group">
           <label>select service advisor</label>
           <div id="advisor-pills" class="chip-container"></div>
@@ -73,6 +73,13 @@
             <input type="text" id="advisor-name-input" placeholder="advisor first name" />
             <input type="email" id="advisor-email-input" placeholder="advisor@thebmwstore.ca" />
           </div>
+        </div>
+
+        <!-- quick cc contacts + manual cc box -->
+        <div class="field-group">
+          <label for="cc-email-input">cc (optional &mdash; click pills or type emails)</label>
+          <div id="cc-pills" class="chip-container"></div>
+          <input type="text" id="cc-email-input" placeholder="cc emails (e.g. dispatch@thebmwstore.ca)" autocomplete="off" />
         </div>
       </div>
 
@@ -84,8 +91,8 @@
 
         <div class="form-grid">
           <div class="field-group">
-            <label for="customer-name">customer full name</label>
-            <input type="text" id="customer-name" placeholder="e.g. Jane Doe" autocomplete="off" />
+            <label for="customer-name">customer first &amp; last name</label>
+            <input type="text" id="customer-name" placeholder="e.g. John Smith (auto-splits 5-6 digit #)" autocomplete="off" />
           </div>
 
           <div class="field-group">
@@ -94,7 +101,7 @@
           </div>
 
           <div class="field-group">
-            <label for="customer-number">tekion customer #</label>
+            <label for="customer-number">customer # (5-6 digits)</label>
             <input type="text" id="customer-number" placeholder="e.g. 482910" autocomplete="off" />
           </div>
 
@@ -113,7 +120,7 @@
 
       <div class="card">
         <div class="card-header">
-          <h2 id="service-section-title">3. requested services / notes</h2>
+          <h2 id="service-section-title">3. problem / requested service</h2>
           <span class="badge">step 3</span>
         </div>
 
@@ -138,8 +145,8 @@
         </div>
 
         <div class="field-group">
-          <label for="custom-notes" id="custom-notes-label">additional service details / request</label>
-          <textarea id="custom-notes" rows="3" placeholder="type extra items, mileage, or status inquiry notes..."></textarea>
+          <label for="custom-notes" id="custom-notes-label">problem / service request details</label>
+          <textarea id="custom-notes" rows="3" placeholder="describe the customer's problem, mileage, or request notes..."></textarea>
         </div>
       </div>
     </section>
@@ -149,7 +156,7 @@
       <div class="card full-height-card">
         <div class="card-header">
           <h2>4. tekion / awp screenshot (ctrl+v)</h2>
-          <span class="badge">ocr auto-fill</span>
+          <span class="badge">auto-ocr</span>
         </div>
 
         <!-- drop and paste box -->
@@ -158,7 +165,7 @@
             <p class="paste-icon">&#128247;</p>
             <p class="paste-title">press <strong>ctrl + v</strong> anywhere on the page</p>
             <p class="paste-desc">
-              take a snip with <code>win + shift + s</code> in tekion or awp, then paste it right here.
+              take a snip with <code>win + shift + s</code> in tekion or awp and paste here &mdash; auto-scans with ocr and splits out the customer's name, 5-6 digit #, phone, and vin.
             </p>
             <label for="file-upload-input" class="btn btn-secondary file-label">
               or choose image file
@@ -174,7 +181,7 @@
         <!-- buttons to run ocr or clear the image -->
         <div class="screenshot-actions">
           <button type="button" id="run-ocr-btn" class="btn btn-primary" disabled>
-            scan screenshot &amp; auto-fill fields (ocr)
+            re-scan screenshot (ocr)
           </button>
           <button type="button" id="clear-screenshot-btn" class="btn btn-secondary" disabled>
             remove screenshot
@@ -182,14 +189,14 @@
         </div>
 
         <div id="ocr-status-box" class="ocr-status-box">
-          <span id="ocr-status-text">waiting for screenshot paste...</span>
+          <span id="ocr-status-text">waiting for screenshot paste (ctrl+v auto-scans)...</span>
         </div>
 
         <!-- backup text box if i just highlight and copy text from tekion -->
         <div class="field-group raw-parser-group">
-          <label for="raw-screen-text">quick text parser (optional: paste copied tekion text here)</label>
+          <label for="raw-screen-text">quick text parser (paste copied tekion text or ocr output)</label>
           <div class="input-with-action">
-            <textarea id="raw-screen-text" rows="2" placeholder="paste highlighted text from tekion/awp to extract name, phone, customer #, and vin"></textarea>
+            <textarea id="raw-screen-text" rows="2" placeholder="paste copied text from tekion/awp to isolate name, 5-6 digit #, phone, and vin"></textarea>
             <button type="button" id="parse-text-btn" class="btn btn-secondary">
               extract
             </button>
@@ -198,11 +205,11 @@
       </div>
     </section>
 
-    <!-- column 3: live email output and copy buttons for outlook -->
+    <!-- column 3: live email output and quick copy buttons for outlook -->
     <section class="panel output-panel">
       <div class="card full-height-card">
         <div class="card-header">
-          <h2>5. live email preview &amp; dispatch</h2>
+          <h2>5. live email preview &amp; outlook copy</h2>
           <span class="badge">ready to send</span>
         </div>
 
@@ -210,8 +217,18 @@
           <label for="preview-to">to (advisor email)</label>
           <div class="input-with-action">
             <input type="text" id="preview-to" readonly placeholder="select an advisor..." />
-            <button type="button" id="copy-email-addr-btn" class="btn btn-secondary">
-              copy email
+            <button type="button" id="copy-email-addr-btn" class="btn btn-accent">
+              copy to
+            </button>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label for="preview-cc">cc (carbon copy)</label>
+          <div class="input-with-action">
+            <input type="text" id="preview-cc" readonly placeholder="optional cc emails..." />
+            <button type="button" id="copy-cc-btn" class="btn btn-accent">
+              copy cc
             </button>
           </div>
         </div>
@@ -228,22 +245,22 @@
 
         <div class="field-group grow-group">
           <label for="preview-body">email body (editable before copying)</label>
-          <textarea id="preview-body" rows="11"></textarea>
+          <textarea id="preview-body" rows="10"></textarea>
         </div>
 
         <!-- buttons to get everything into outlook fast -->
         <div class="dispatch-buttons">
-          <button type="button" id="copy-rich-email-btn" class="btn btn-primary btn-large">
-            copy rich email + screenshot (paste into outlook)
-          </button>
           <div class="dispatch-row-secondary">
-            <button type="button" id="copy-plain-body-btn" class="btn btn-secondary">
-              copy text body only
+            <button type="button" id="copy-plain-body-btn" class="btn btn-primary btn-large">
+              copy text body
             </button>
-            <button type="button" id="open-mailto-btn" class="btn btn-secondary">
-              open in email client (mailto:)
+            <button type="button" id="copy-rich-email-btn" class="btn btn-accent btn-large">
+              copy body + screenshot
             </button>
           </div>
+          <button type="button" id="open-mailto-btn" class="btn btn-secondary">
+            open in email client (mailto: with to &amp; cc)
+          </button>
         </div>
 
         <div id="toast-message" class="toast-message" role="status" aria-live="polite">
