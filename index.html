@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>The BMW Store | Service Desk</title>
+  <title>The BMW Store &amp; Rolls-Royce | Service Desk</title>
   <link rel="stylesheet" href="style.css" />
   <!-- tesseract ocr so i can scan my tekion screenshots -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
@@ -19,7 +19,7 @@
         <span class="m-red"></span>
       </div>
       <div>
-        <h1>The BMW Store &mdash; Service Desk</h1>
+        <h1>The BMW Store &amp; Rolls-Royce &mdash; Service Desk</h1>
         <p class="subtitle">paste screenshot &bull; pick advisor &bull; copy email</p>
       </div>
     </div>
@@ -50,7 +50,7 @@
           <div id="paste-placeholder" class="paste-placeholder compact-placeholder">
             <p class="paste-title">press <strong>ctrl + v</strong> anywhere to paste screenshot or copied text</p>
             <p class="paste-desc">
-              auto-fills customer name, 5-6 digit #, phone, and vin from tekion / awp.
+              auto-fills customer name, customer #, phone, and bmw/rolls-royce vin from tekion / awp.
             </p>
             <label for="file-upload-input" class="btn btn-secondary btn-small">
               choose image file
@@ -91,19 +91,19 @@
           </div>
 
           <div class="field-group">
-            <label for="customer-number">customer # (5-6 digits)</label>
-            <input type="text" id="customer-number" placeholder="e.g. 482910" autocomplete="off" />
+            <label for="customer-number">customer #</label>
+            <input type="text" id="customer-number" placeholder="e.g. 482910 or 48-2910" autocomplete="off" />
           </div>
 
           <div class="field-group">
             <label for="customer-phone">phone number</label>
-            <input type="text" id="customer-phone" placeholder="e.g. 604-555-0199" autocomplete="off" />
+            <input type="text" id="customer-phone" placeholder="e.g. 6045550199 or 604-555-0199" autocomplete="off" />
           </div>
 
           <div class="field-group">
-            <label for="customer-vin">vin (full 17 or last 7)</label>
+            <label for="customer-vin">vin (bmw / rolls-royce)</label>
             <div class="input-with-action">
-              <input type="text" id="customer-vin" placeholder="WBA5A7C55FD682910" autocomplete="off" />
+              <input type="text" id="customer-vin" placeholder="WBA... or SCA..." autocomplete="off" />
               <button type="button" id="copy-last7-btn" class="btn btn-accent btn-small" title="copy last 7 for awp">
                 last 7
               </button>
@@ -157,7 +157,7 @@
         </div>
 
         <div id="service-chips-wrapper" class="field-group">
-          <label>quick bmw services</label>
+          <label>quick bmw &amp; rolls-royce services</label>
           <div id="service-chips" class="chip-container">
             <button type="button" class="chip service-chip" data-service="Oil Service">Oil Service</button>
             <button type="button" class="chip service-chip" data-service="Brake Fluid Flush">Brake Fluid Flush</button>
@@ -291,17 +291,20 @@
         <hr class="divider" />
 
         <div class="field-group">
-          <label>portable backup (advisors.json)</label>
+          <label>portable backup (usb / browser fallback)</label>
           <div class="settings-config-actions">
             <button type="button" id="export-config-btn" class="btn btn-secondary">
               export advisors.json
+            </button>
+            <button type="button" id="export-js-config-btn" class="btn btn-secondary">
+              save advisors-config.js
             </button>
             <label for="import-config-input" class="btn btn-secondary file-label-inline">
               import advisors.json
             </label>
             <input type="file" id="import-config-input" accept=".json,application/json" hidden />
           </div>
-          <small id="usb-sync-status" class="helper-text">saving changes updates advisors.json when launched via workslacker.bat.</small>
+          <small id="usb-sync-status" class="helper-text">saving changes updates advisors.json and advisors-config.js when launched via workslacker.bat.</small>
         </div>
       </div>
     </div>
