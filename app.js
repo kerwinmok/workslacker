@@ -1,6 +1,7 @@
 // keys i use to save my settings in browser localstorage
 const STORAGE_KEYS = {
   ADVISORS: "bmw_service_advisors_v1",
+  CC_LIST: "bmw_service_cc_v1",
   SIGNATURE: "bmw_service_signature_v1",
   THEME: "bmw_service_theme_v1"
 };
@@ -13,6 +14,12 @@ const DEFAULT_ADVISORS = [
   { name: "Taylor", email: "taylor@thebmwstore.ca" }
 ];
 
+// starter list of quick cc contacts
+const DEFAULT_CC_LIST = [
+  { name: "Service Dispatch", email: "dispatch@thebmwstore.ca" },
+  { name: "BDC / Appointments", email: "appointments@thebmwstore.ca" }
+];
+
 // my default email sign-off
 const DEFAULT_SIGNATURE = "Thank you,\nKerwin\nService Coordinator | The BMW Store";
 
@@ -20,6 +27,8 @@ const DEFAULT_SIGNATURE = "Thank you,\nKerwin\nService Coordinator | The BMW Sto
 const appState = {
   mode: "quote",
   advisors: [],
+  ccContacts: [],
+  selectedCcEmails: [],
   selectedAdvisorIndex: -1,
   selectedServices: [],
   signature: DEFAULT_SIGNATURE,
@@ -27,7 +36,7 @@ const appState = {
   screenshotBlob: null
 };
 
-// pull my saved advisors, signature, and theme from localstorage
+// pull my saved advisors, cc list, signature, and theme from storage
 function loadSavedSettings() {
   const savedAdvisorsRaw = localStorage.getItem(STORAGE_KEYS.ADVISORS);
   if (savedAdvisorsRaw) {
@@ -38,6 +47,17 @@ function loadSavedSettings() {
     }
   } else {
     appState.advisors = DEFAULT_ADVISORS.slice();
+  }
+
+  const savedCcRaw = localStorage.getItem(STORAGE_KEYS.CC_LIST);
+  if (savedCcRaw) {
+    try {
+      appState.ccContacts = JSON.parse(savedCcRaw);
+    } catch (err) {
+      appState.ccContacts = DEFAULT_CC_LIST.slice();
+    }
+  } else {
+    appState.ccContacts = DEFAULT_CC_LIST.slice();
   }
 
   const savedSignature = localStorage.getItem(STORAGE_KEYS.SIGNATURE);
@@ -58,9 +78,10 @@ function loadSavedSettings() {
   }
 }
 
-// save my advisor list and signature back to localstorage
+// save my advisor list, cc list, and signature back to localstorage
 function saveSettingsToStorage() {
   localStorage.setItem(STORAGE_KEYS.ADVISORS, JSON.stringify(appState.advisors));
+  localStorage.setItem(STORAGE_KEYS.CC_LIST, JSON.stringify(appState.ccContacts));
   localStorage.setItem(STORAGE_KEYS.SIGNATURE, appState.signature);
 }
 
@@ -106,6 +127,105 @@ function renderAdvisorPills() {
     });
 
     container.appendChild(pill);
+  }
+}
+
+// split a comma or semicolon list of emails into a clean deduplicated array
+function parseEmailList(rawValue) {
+  if (!rawValue || rawValue.trim() === "") {
+    return [];
+  }
+  const parts = rawValue.split(/[,;]+/);
+  const cleaned = [];
+  for (let i = 0; i < parts.length; i++) {
+    const email = parts[i].trim();
+    if (email !== "" && cleaned.indexOf(email) === -1) {
+      cleaned.push(email);
+    }
+  }
+  return cleaned;
+}
+
+// build quick cc buttons so i can click to add/remove cc recipients
+function renderCcPills() {
+  const container = document.getElementById("cc-pills");
+  if (!container) {
+    return;
+  }
+  container.innerHTML = "";
+
+  const ccInput = document.getElementById("cc-email-input");
+  let currentEmails = [];
+  if (ccInput) {
+    currentEmails = parseEmailList(ccInput.value);
+  }
+  appState.selectedCcEmails = currentEmails;
+
+  for (let i = 0; i < appState.ccContacts.length; i++) {
+    const contact = appState.ccContacts[i];
+    const pill = document.createElement("button");
+    pill.type = "button";
+    pill.className = "chip";
+    if (currentEmails.indexOf(contact.email) !== -1) {
+      pill.classList.add("active");
+    }
+    pill.textContent = contact.name;
+
+    pill.addEventListener("click", function () {
+      const box = document.getElementById("cc-email-input");
+      let list = [];
+      if (box) {
+        list = parseEmailList(box.value);
+      }
+      const idx = list.indexOf(contact.email);
+      if (idx === -1) {
+        list.push(contact.email);
+      } else {
+        list.splice(idx, 1);
+      }
+      if (box) {
+        box.value = list.join(", ");
+      }
+      appState.selectedCcEmails = list;
+      renderCcPills();
+      updateEmailPreview();
+    });
+
+    container.appendChild(pill);
+  }
+}
+
+// show my saved cc contacts inside settings so i can add or delete them
+function renderSettingsCcList() {
+  const listEl = document.getElementById("settings-cc-list");
+  if (!listEl) {
+    return;
+  }
+  listEl.innerHTML = "";
+
+  for (let i = 0; i < appState.ccContacts.length; i++) {
+    const contact = appState.ccContacts[i];
+    const row = document.createElement("div");
+    row.className = "advisor-row-item";
+
+    const infoSpan = document.createElement("span");
+    infoSpan.textContent = contact.name + " (" + contact.email + ")";
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "btn btn-danger";
+    removeBtn.textContent = "remove";
+    removeBtn.addEventListener("click", function () {
+      appState.ccContacts.splice(i, 1);
+      saveSettingsToStorage();
+      renderCcPills();
+      renderSettingsCcList();
+      updateEmailPreview();
+    });
+
+    row.appendChild(infoSpan);
+    row.appendChild(removeBtn);
+    listEl.appendChild(row);
   }
 }
 
@@ -176,6 +296,7 @@ function getRequestedServicesText() {
 function updateEmailPreview() {
   const advisorNameEl = document.getElementById("advisor-name-input");
   const advisorEmailEl = document.getElementById("advisor-email-input");
+  const ccEmailEl = document.getElementById("cc-email-input");
   const customerNameEl = document.getElementById("customer-name");
   const customerPhoneEl = document.getElementById("customer-phone");
   const customerNumberEl = document.getElementById("customer-number");
@@ -191,7 +312,12 @@ function updateEmailPreview() {
     advisorEmail = advisorEmailEl.value.trim();
   }
 
-  let customerName = "[Customer's Full Name]";
+  let ccEmail = "";
+  if (ccEmailEl && ccEmailEl.value.trim() !== "") {
+    ccEmail = parseEmailList(ccEmailEl.value).join(", ");
+  }
+
+  let customerName = "[Customer Name]";
   if (customerNameEl && customerNameEl.value.trim() !== "") {
     customerName = customerNameEl.value.trim();
   }
@@ -201,7 +327,7 @@ function updateEmailPreview() {
     phoneNumber = customerPhoneEl.value.trim();
   }
 
-  let customerNumber = "[Tekion Customer #]";
+  let customerNumber = "";
   if (customerNumberEl && customerNumberEl.value.trim() !== "") {
     customerNumber = customerNumberEl.value.trim();
   }
@@ -218,7 +344,7 @@ function updateEmailPreview() {
 
   if (appState.mode === "quote") {
     subjectLine = "Price Quote: " + customerName;
-    openingLine = "Could you please give a price quote for " + serviceDetails + "?";
+    openingLine = "Could you please provide a price quote for " + serviceDetails + "?";
   } else if (appState.mode === "status") {
     subjectLine = "Status Update: " + customerName;
     openingLine = "Could you please provide a status update for " + customerName + " regarding " + serviceDetails + "?";
@@ -232,20 +358,29 @@ function updateEmailPreview() {
     "",
     openingLine,
     "",
-    "Customer Name: " + customerName,
-    "Phone Number: " + phoneNumber,
-    "Customer Number: " + customerNumber,
-    "VIN (Last 7 / Full): " + vinValue,
-    "",
-    appState.signature
+    "Customer Name: " + customerName
   ];
 
+  if (customerNumber !== "") {
+    bodyLines.push("Customer #: " + customerNumber);
+  }
+
+  bodyLines.push("Phone Number: " + phoneNumber);
+  bodyLines.push("VIN (Last 7 / Full): " + vinValue);
+  bodyLines.push("Problem / Service: " + serviceDetails);
+  bodyLines.push("");
+  bodyLines.push(appState.signature);
+
   const previewTo = document.getElementById("preview-to");
+  const previewCc = document.getElementById("preview-cc");
   const previewSubject = document.getElementById("preview-subject");
   const previewBody = document.getElementById("preview-body");
 
   if (previewTo) {
     previewTo.value = advisorEmail;
+  }
+  if (previewCc) {
+    previewCc.value = ccEmail;
   }
   if (previewSubject) {
     previewSubject.value = subjectLine;
@@ -714,7 +849,7 @@ function resetCallForm() {
     clearBtn.disabled = true;
   }
   if (statusText) {
-    statusText.textContent = "waiting for screenshot paste...";
+    statusText.textContent = "waiting for screenshot paste (ctrl+v auto-scans)...";
   }
 
   const vinHelper = document.getElementById("vin-helper-text");
@@ -731,6 +866,8 @@ function initializeDashboardEvents() {
   loadSavedSettings();
   renderAdvisorPills();
   renderSettingsAdvisorList();
+  renderCcPills();
+  renderSettingsCcList();
 
   const sigInput = document.getElementById("signature-input");
   if (sigInput) {
@@ -782,6 +919,7 @@ function initializeDashboardEvents() {
   const liveFieldIds = [
     "advisor-name-input",
     "advisor-email-input",
+    "cc-email-input",
     "customer-name",
     "customer-phone",
     "customer-number",
@@ -803,6 +941,9 @@ function initializeDashboardEvents() {
               helper.textContent = "paste full vin or 7 chars for awp";
             }
           }
+        }
+        if (liveFieldIds[i] === "cc-email-input") {
+          renderCcPills();
         }
         updateEmailPreview();
       });
@@ -941,7 +1082,7 @@ function initializeDashboardEvents() {
     });
   }
 
-  // buttons for copying advisor email, subject line, body, and opening mailto
+  // buttons for copying advisor email, cc, subject line, body, and opening mailto
   const copyEmailAddrBtn = document.getElementById("copy-email-addr-btn");
   if (copyEmailAddrBtn) {
     copyEmailAddrBtn.addEventListener("click", async function () {
@@ -951,6 +1092,19 @@ function initializeDashboardEvents() {
         showToast("copied advisor email address.");
       } else {
         showToast("select an advisor first.");
+      }
+    });
+  }
+
+  const copyCcBtn = document.getElementById("copy-cc-btn");
+  if (copyCcBtn) {
+    copyCcBtn.addEventListener("click", async function () {
+      const ccEl = document.getElementById("preview-cc");
+      if (ccEl && ccEl.value.trim() !== "") {
+        await navigator.clipboard.writeText(ccEl.value.trim());
+        showToast("copied cc email address(es).");
+      } else {
+        showToast("no cc emails entered.");
       }
     });
   }
@@ -988,12 +1142,17 @@ function initializeDashboardEvents() {
   if (openMailtoBtn) {
     openMailtoBtn.addEventListener("click", function () {
       const toEl = document.getElementById("preview-to");
+      const ccEl = document.getElementById("preview-cc");
       const subjEl = document.getElementById("preview-subject");
       const bodyEl = document.getElementById("preview-body");
 
       let toAddr = "";
       if (toEl) {
         toAddr = toEl.value.trim();
+      }
+      let ccAddr = "";
+      if (ccEl) {
+        ccAddr = ccEl.value.trim();
       }
       let subject = "";
       if (subjEl) {
@@ -1004,7 +1163,12 @@ function initializeDashboardEvents() {
         body = encodeURIComponent(bodyEl.value);
       }
 
-      window.location.href = "mailto:" + toAddr + "?subject=" + subject + "&body=" + body;
+      let mailtoUrl = "mailto:" + toAddr + "?subject=" + subject + "&body=" + body;
+      if (ccAddr !== "") {
+        mailtoUrl = mailtoUrl + "&cc=" + encodeURIComponent(ccAddr);
+      }
+
+      window.location.href = mailtoUrl;
       showToast("opened default mail client. press ctrl+v in body if pasting screenshot.");
     });
   }
@@ -1073,6 +1237,31 @@ function initializeDashboardEvents() {
       renderAdvisorPills();
       renderSettingsAdvisorList();
       showToast("added advisor " + nameVal + ".");
+    });
+  }
+
+  // add a new quick cc contact to my saved list
+  const addCcBtn = document.getElementById("add-cc-btn");
+  if (addCcBtn) {
+    addCcBtn.addEventListener("click", function () {
+      const nameEl = document.getElementById("new-cc-name");
+      const emailEl = document.getElementById("new-cc-email");
+      if (!nameEl || !emailEl) {
+        return;
+      }
+      const nameVal = nameEl.value.trim();
+      const emailVal = emailEl.value.trim();
+      if (nameVal === "" || emailVal === "") {
+        showToast("enter both cc label and email.");
+        return;
+      }
+      appState.ccContacts.push({ name: nameVal, email: emailVal });
+      nameEl.value = "";
+      emailEl.value = "";
+      saveSettingsToStorage();
+      renderCcPills();
+      renderSettingsCcList();
+      showToast("added cc contact " + nameVal + ".");
     });
   }
 
