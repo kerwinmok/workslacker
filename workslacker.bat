@@ -1,8 +1,48 @@
-# local zero-admin web server so i can run workslacker cleanly from my usb stick
+@echo off
+set "WORKSLACKER_ROOT=%~dp0"
+set "APP_URL_FILE=file:///%WORKSLACKER_ROOT:\=/%index.html"
+set "WORKSLACKER_SELF=%~f0"
+cd /d "%TEMP%"
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "exit 0" >nul 2>&1
+if errorlevel 1 goto fallback
+
+start "" powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command "$raw = [System.IO.File]::ReadAllText($env:WORKSLACKER_SELF); $marker = [char]58 + 'POWERSHELL_CODE'; $pos = $raw.IndexOf($marker); if ($pos -ge 0) { $psCode = $raw.Substring($pos + $marker.Length); & ([scriptblock]::Create($psCode)) }"
+exit /b 0
+
+:fallback
+where msedge >nul 2>&1
+if not errorlevel 1 (
+  start "" msedge --app="%APP_URL_FILE%" --window-size=1360,860
+  exit /b 0
+)
+if exist "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" (
+  start "" "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" --app="%APP_URL_FILE%" --window-size=1360,860
+  exit /b 0
+)
+if exist "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" (
+  start "" "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" --app="%APP_URL_FILE%" --window-size=1360,860
+  exit /b 0
+)
+if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" (
+  start "" "%ProgramFiles%\Google\Chrome\Application\chrome.exe" --app="%APP_URL_FILE%" --window-size=1360,860
+  exit /b 0
+)
+if exist "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" (
+  start "" "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" --app="%APP_URL_FILE%" --window-size=1360,860
+  exit /b 0
+)
+start "" "%WORKSLACKER_ROOT%index.html"
+exit /b 0
+
+:POWERSHELL_CODE
 $ErrorActionPreference = "Stop"
 
-$usbRoot = $PSScriptRoot
-# move working directory off the usb drive so windows can still eject cleanly later
+$usbRoot = $env:WORKSLACKER_ROOT
+if ([string]::IsNullOrWhiteSpace($usbRoot)) {
+  $usbRoot = (Get-Location).Path
+}
+$usbRoot = $usbRoot.TrimEnd("\", "/")
 Set-Location $env:TEMP
 
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
@@ -39,7 +79,7 @@ function Start-AppWindow {
 
   $browserExe = Find-AppBrowser
   if ($browserExe -ne "") {
-    Start-Process -FilePath $browserExe -ArgumentList "--app=$TargetUrl", "--window-size=1380,880"
+    Start-Process -FilePath $browserExe -ArgumentList "--app=$TargetUrl", "--window-size=1360,860"
   } else {
     Start-Process -FilePath $TargetUrl
   }
@@ -119,18 +159,10 @@ function Get-MimeType {
 function Save-PortableConfig {
   param([string]$JsonPayload)
 
-  # parse and re-serialize so invalid json is rejected safely
   $parsed = $JsonPayload | ConvertFrom-Json
   $cleanJson = $parsed | ConvertTo-Json -Depth 10
-
   $jsonPath = Join-Path $usbRoot "advisors.json"
-  $jsPath = Join-Path $usbRoot "advisors-config.js"
-
   [System.IO.File]::WriteAllText($jsonPath, $cleanJson + "`r`n", $utf8NoBom)
-
-  $jsBody = "// portable config file so my advisors and cc presets load even over file://`r`n" +
-    "window.USB_SAVED_CONFIG = " + $cleanJson + ";`r`n"
-  [System.IO.File]::WriteAllText($jsPath, $jsBody, $utf8NoBom)
 }
 
 function Read-HttpRequest {
@@ -209,7 +241,7 @@ function Read-HttpRequest {
   }
 
   $rawTarget = $requestParts[1]
-  $queryPos = $rawTarget.IndexOf("?")
+  $queryPos = $rawTarget.IndexOf([char]63)
   $cleanPath = $rawTarget
   if ($queryPos -ge 0) {
     $cleanPath = $rawTarget.Substring(0, $queryPos)
@@ -222,7 +254,6 @@ function Read-HttpRequest {
   }
 }
 
-# reuse existing local server for this usb folder if already running
 for ($checkPort = 8765; $checkPort -le 8785; $checkPort++) {
   if (Test-ExistingServer -PortToCheck $checkPort -ExpectedRoot $usbRoot) {
     Start-AppWindow -TargetUrl "http://127.0.0.1:$checkPort/"
@@ -240,17 +271,16 @@ for ($tryPort = 8765; $tryPort -le 8785; $tryPort++) {
     $activePort = $tryPort
     break
   } catch {
-    # try next port if busy
   }
 }
 
 if ($null -eq $listener) {
-  Write-Error "could not bind a local port between 8765 and 8785."
-  exit 1
+  $fileFallback = "file:///" + ($usbRoot -replace "\\", "/") + "/index.html"
+  Start-AppWindow -TargetUrl $fileFallback
+  exit 0
 }
 
 $appUrl = "http://127.0.0.1:$activePort/"
-Write-Host "workslacker running at $appUrl (usb folder: $usbRoot)"
 Start-AppWindow -TargetUrl $appUrl
 
 try {
@@ -300,7 +330,6 @@ try {
         }
       }
 
-      # static file serving from usb folder
       $relPath = $req.Path
       if ($relPath -eq "/") {
         $relPath = "/index.html"
@@ -322,7 +351,6 @@ try {
         Send-HttpResponse -Stream $stream -StatusCode 404 -StatusText "Not Found" -ContentType "text/plain" -BodyBytes $notFoundBytes
       }
     } catch {
-      # keep serving next request if client disconnects early
     } finally {
       $client.Close()
     }
