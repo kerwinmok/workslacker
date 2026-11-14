@@ -287,7 +287,7 @@
         <hr class="divider" />
 
         <div class="field-group">
-          <label>saved service advisors (stored locally in my browser)</label>
+          <label>saved service advisors (synced to usb advisors.json + browser)</label>
           <div id="settings-advisor-list" class="settings-advisor-list"></div>
 
           <div class="add-advisor-row">
@@ -295,6 +295,35 @@
             <input type="email" id="new-advisor-email" placeholder="alex@thebmwstore.ca" />
             <button type="button" id="add-advisor-btn" class="btn btn-accent">add advisor</button>
           </div>
+        </div>
+
+        <hr class="divider" />
+
+        <div class="field-group">
+          <label>saved quick cc contacts (synced to usb advisors.json + browser)</label>
+          <div id="settings-cc-list" class="settings-advisor-list"></div>
+
+          <div class="add-advisor-row">
+            <input type="text" id="new-cc-name" placeholder="label (e.g. Dispatch)" />
+            <input type="email" id="new-cc-email" placeholder="dispatch@thebmwstore.ca" />
+            <button type="button" id="add-cc-btn" class="btn btn-accent">add cc</button>
+          </div>
+        </div>
+
+        <hr class="divider" />
+
+        <div class="field-group">
+          <label>portable usb backup (advisors.json)</label>
+          <div class="settings-config-actions">
+            <button type="button" id="export-config-btn" class="btn btn-secondary">
+              export config (advisors.json)
+            </button>
+            <label for="import-config-input" class="btn btn-secondary file-label-inline">
+              import config (.json)
+            </label>
+            <input type="file" id="import-config-input" accept=".json,application/json" hidden />
+          </div>
+          <small id="usb-sync-status" class="helper-text">saving changes updates both browser storage and usb config when launched via usb launcher.</small>
         </div>
       </div>
     </div>
