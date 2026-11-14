@@ -82,23 +82,18 @@ function setUsbSyncStatus(text) {
   }
 }
 
-// pull my saved advisors, cc list, signature, and theme from usb config + storage
+// pull my saved advisors, cc list, signature, and theme from localstorage
 function loadSavedSettings() {
-  // start with portable usb config fallback if bundled via advisors-config.js
-  if (window.USB_SAVED_CONFIG) {
-    applyConfigObject(window.USB_SAVED_CONFIG);
-  } else {
-    appState.advisors = DEFAULT_ADVISORS.slice();
-    appState.ccContacts = DEFAULT_CC_LIST.slice();
-    appState.signature = DEFAULT_SIGNATURE;
-  }
+  appState.advisors = DEFAULT_ADVISORS.slice();
+  appState.ccContacts = DEFAULT_CC_LIST.slice();
+  appState.signature = DEFAULT_SIGNATURE;
 
   const savedAdvisorsRaw = localStorage.getItem(STORAGE_KEYS.ADVISORS);
   if (savedAdvisorsRaw) {
     try {
       appState.advisors = JSON.parse(savedAdvisorsRaw);
     } catch (err) {
-      // keep usb or default list
+      // keep default list
     }
   }
 
@@ -107,7 +102,7 @@ function loadSavedSettings() {
     try {
       appState.ccContacts = JSON.parse(savedCcRaw);
     } catch (err) {
-      // keep usb or default list
+      // keep default list
     }
   }
 
@@ -122,15 +117,34 @@ function loadSavedSettings() {
     document.body.classList.add("light-theme");
     const themeBtn = document.getElementById("theme-toggle-btn");
     if (themeBtn) {
-      themeBtn.textContent = "switch to dark mode";
+      themeBtn.textContent = "dark mode";
     }
   }
+}
+
+// select an advisor by index and populate the to fields
+function selectAdvisorByIndex(idx) {
+  if (idx < 0 || idx >= appState.advisors.length) {
+    return;
+  }
+  const advisor = appState.advisors[idx];
+  appState.selectedAdvisorIndex = idx;
+  const nameInput = document.getElementById("advisor-name-input");
+  const emailInput = document.getElementById("advisor-email-input");
+  if (nameInput) {
+    nameInput.value = advisor.name;
+  }
+  if (emailInput) {
+    emailInput.value = advisor.email;
+  }
+  renderAdvisorPills();
+  updateEmailPreview();
 }
 
 // pull the latest advisors.json from my local usb server so changes carry across pcs
 async function syncConfigFromUsbServer() {
   if (!isLocalUsbServer()) {
-    setUsbSyncStatus("running offline / browser mode — changes save in browser storage (use export below for usb backup).");
+    setUsbSyncStatus("browser mode — changes save locally (use export for advisors.json backup).");
     return;
   }
 
@@ -149,15 +163,21 @@ async function syncConfigFromUsbServer() {
       if (sigInput) {
         sigInput.value = appState.signature;
       }
-      renderAdvisorPills();
+      if (appState.advisors.length > 0 && (appState.selectedAdvisorIndex < 0 || appState.selectedAdvisorIndex >= appState.advisors.length)) {
+        selectAdvisorByIndex(0);
+      } else if (appState.selectedAdvisorIndex >= 0 && appState.selectedAdvisorIndex < appState.advisors.length) {
+        selectAdvisorByIndex(appState.selectedAdvisorIndex);
+      } else {
+        renderAdvisorPills();
+      }
       renderSettingsAdvisorList();
       renderCcPills();
       renderSettingsCcList();
       updateEmailPreview();
-      setUsbSyncStatus("connected to usb drive — advisors and cc presets auto-sync to advisors.json.");
+      setUsbSyncStatus("connected — advisors and cc presets auto-save to advisors.json.");
     }
   } catch (err) {
-    setUsbSyncStatus("could not reach local usb server — using browser storage.");
+    setUsbSyncStatus("could not reach local server — using browser storage.");
   }
 }
 
@@ -218,17 +238,7 @@ function renderAdvisorPills() {
     pill.textContent = advisor.name;
 
     pill.addEventListener("click", function () {
-      appState.selectedAdvisorIndex = i;
-      const nameInput = document.getElementById("advisor-name-input");
-      const emailInput = document.getElementById("advisor-email-input");
-      if (nameInput) {
-        nameInput.value = advisor.name;
-      }
-      if (emailInput) {
-        emailInput.value = advisor.email;
-      }
-      renderAdvisorPills();
-      updateEmailPreview();
+      selectAdvisorByIndex(i);
     });
 
     container.appendChild(pill);
@@ -389,9 +399,9 @@ function getRequestedServicesText() {
 
   if (combined.length === 0) {
     if (appState.mode === "quote") {
-      return "[requested service]";
+      return "[problem / requested service]";
     }
-    return "their vehicle";
+    return "[details / inquiry]";
   }
 
   return combined.join(", ");
@@ -407,7 +417,7 @@ function updateEmailPreview() {
   const customerNumberEl = document.getElementById("customer-number");
   const customerVinEl = document.getElementById("customer-vin");
 
-  let advisorName = "[Service Advisor Name]";
+  let advisorName = "[Service Advisor]";
   if (advisorNameEl && advisorNameEl.value.trim() !== "") {
     advisorName = advisorNameEl.value.trim();
   }
@@ -449,13 +459,13 @@ function updateEmailPreview() {
 
   if (appState.mode === "quote") {
     subjectLine = "Price Quote: " + customerName;
-    openingLine = "Could you please provide a price quote for " + serviceDetails + "?";
+    openingLine = "Could you please provide a price quote for the request below?";
   } else if (appState.mode === "status") {
     subjectLine = "Status Update: " + customerName;
-    openingLine = "Could you please provide a status update for " + customerName + " regarding " + serviceDetails + "?";
+    openingLine = "Could you please provide a status update for the customer below?";
   } else {
     subjectLine = "Callback Request: " + customerName;
-    openingLine = "Could you please give " + customerName + " a call back regarding " + serviceDetails + "?";
+    openingLine = "Could you please give the customer below a call back?";
   }
 
   const bodyLines = [
@@ -840,13 +850,9 @@ async function runScreenshotOcr() {
     const enhancedUrl = await preprocessImageForOcr(appState.screenshotDataUrl);
     const result = await window.Tesseract.recognize(enhancedUrl, "eng");
     const extractedText = result.data.text;
-    const rawBox = document.getElementById("raw-screen-text");
-    if (rawBox) {
-      rawBox.value = extractedText;
-    }
     parseTekionOrAwpText(extractedText);
     if (statusText) {
-      statusText.textContent = "ocr scan complete! verify extracted fields on the left.";
+      statusText.textContent = "ocr done — verify fields below.";
     }
   } catch (err) {
     if (statusText) {
@@ -904,31 +910,8 @@ async function copyRichEmailWithScreenshot() {
   showToast("copied plain text body to clipboard.");
 }
 
-// wipe the form clean when the next customer calls in
-function resetCallForm() {
-  const fieldIds = [
-    "customer-name",
-    "customer-phone",
-    "customer-number",
-    "customer-vin",
-    "custom-notes",
-    "raw-screen-text"
-  ];
-
-  for (let i = 0; i < fieldIds.length; i++) {
-    const el = document.getElementById(fieldIds[i]);
-    if (el) {
-      el.value = "";
-    }
-  }
-
-  appState.selectedServices = [];
-  const serviceButtons = document.querySelectorAll(".service-chip");
-  for (let i = 0; i < serviceButtons.length; i++) {
-    serviceButtons[i].classList.remove("active");
-  }
-
-  // clear out the old screenshot
+// reset the screenshot box and action buttons
+function clearScreenshotPreview(statusMessage) {
   appState.screenshotDataUrl = "";
   appState.screenshotBlob = null;
   const imgEl = document.getElementById("screenshot-img");
@@ -954,8 +937,34 @@ function resetCallForm() {
     clearBtn.disabled = true;
   }
   if (statusText) {
-    statusText.textContent = "waiting for screenshot paste (ctrl+v auto-scans)...";
+    statusText.textContent = statusMessage;
   }
+}
+
+// wipe the form clean when the next customer calls in
+function resetCallForm() {
+  const fieldIds = [
+    "customer-name",
+    "customer-phone",
+    "customer-number",
+    "customer-vin",
+    "custom-notes"
+  ];
+
+  for (let i = 0; i < fieldIds.length; i++) {
+    const el = document.getElementById(fieldIds[i]);
+    if (el) {
+      el.value = "";
+    }
+  }
+
+  appState.selectedServices = [];
+  const serviceButtons = document.querySelectorAll(".service-chip");
+  for (let i = 0; i < serviceButtons.length; i++) {
+    serviceButtons[i].classList.remove("active");
+  }
+
+  clearScreenshotPreview("waiting for paste (ctrl+v)...");
 
   const vinHelper = document.getElementById("vin-helper-text");
   if (vinHelper) {
@@ -969,7 +978,11 @@ function resetCallForm() {
 // hook up all the buttons and inputs once the page loads
 function initializeDashboardEvents() {
   loadSavedSettings();
-  renderAdvisorPills();
+  if (appState.advisors.length > 0) {
+    selectAdvisorByIndex(0);
+  } else {
+    renderAdvisorPills();
+  }
   renderSettingsAdvisorList();
   renderCcPills();
   renderSettingsCcList();
@@ -1120,10 +1133,6 @@ function initializeDashboardEvents() {
     if (!isTypingField) {
       const pastedText = event.clipboardData.getData("text/plain");
       if (pastedText && pastedText.trim() !== "") {
-        const rawBox = document.getElementById("raw-screen-text");
-        if (rawBox) {
-          rawBox.value = pastedText;
-        }
         parseTekionOrAwpText(pastedText);
         event.preventDefault();
       }
@@ -1151,39 +1160,7 @@ function initializeDashboardEvents() {
   const clearScreenshotBtn = document.getElementById("clear-screenshot-btn");
   if (clearScreenshotBtn) {
     clearScreenshotBtn.addEventListener("click", function () {
-      appState.screenshotDataUrl = "";
-      appState.screenshotBlob = null;
-      const imgEl = document.getElementById("screenshot-img");
-      const previewWrap = document.getElementById("screenshot-preview-wrap");
-      const placeholder = document.getElementById("paste-placeholder");
-      const statusText = document.getElementById("ocr-status-text");
-      if (imgEl) {
-        imgEl.src = "";
-      }
-      if (previewWrap) {
-        previewWrap.classList.add("hidden");
-      }
-      if (placeholder) {
-        placeholder.classList.remove("hidden");
-      }
-      if (runOcrBtn) {
-        runOcrBtn.disabled = true;
-      }
-      clearScreenshotBtn.disabled = true;
-      if (statusText) {
-        statusText.textContent = "screenshot removed.";
-      }
-    });
-  }
-
-  // extract fields from raw copied tekion text
-  const parseTextBtn = document.getElementById("parse-text-btn");
-  if (parseTextBtn) {
-    parseTextBtn.addEventListener("click", function () {
-      const rawBox = document.getElementById("raw-screen-text");
-      if (rawBox) {
-        parseTekionOrAwpText(rawBox.value);
-      }
+      clearScreenshotPreview("screenshot removed.");
     });
   }
 
@@ -1286,12 +1263,12 @@ function initializeDashboardEvents() {
       if (isLight) {
         document.body.classList.remove("light-theme");
         document.body.classList.add("dark-theme");
-        themeToggleBtn.textContent = "switch to light mode";
+        themeToggleBtn.textContent = "light mode";
         localStorage.setItem(STORAGE_KEYS.THEME, "dark");
       } else {
         document.body.classList.remove("dark-theme");
         document.body.classList.add("light-theme");
-        themeToggleBtn.textContent = "switch to dark mode";
+        themeToggleBtn.textContent = "dark mode";
         localStorage.setItem(STORAGE_KEYS.THEME, "light");
       }
     });
