@@ -501,11 +501,75 @@ function handleScreenshotBlob(blob) {
       clearBtn.disabled = false;
     }
     if (statusText) {
-      statusText.textContent = "screenshot attached! click 'scan screenshot' to auto-fill fields, or copy rich email.";
+      statusText.textContent = "screenshot attached! auto-scanning with ocr...";
     }
-    showToast("screenshot pasted into dashboard.");
+    showToast("screenshot pasted - running auto-ocr...");
+    runScreenshotOcr();
   };
   reader.readAsDataURL(blob);
+}
+
+// upscale small tekion snips and boost contrast so tesseract reads numbers and vins accurately
+function preprocessImageForOcr(dataUrl) {
+  return new Promise(function (resolve) {
+    const img = new Image();
+    img.onload = function () {
+      try {
+        let scale = 1;
+        if (img.width < 1200) {
+          scale = 2;
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(dataUrl);
+          return;
+        }
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        let brightnessTotal = 0;
+        for (let i = 0; i < data.length; i = i + 4) {
+          const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+          brightnessTotal = brightnessTotal + gray;
+        }
+        const pixelCount = data.length / 4;
+        const avgBrightness = brightnessTotal / pixelCount;
+        // invert dark-mode screenshots so tesseract always reads dark text on a light background
+        const isDarkBackground = avgBrightness < 115;
+
+        for (let i = 0; i < data.length; i = i + 4) {
+          let gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+          if (isDarkBackground) {
+            gray = 255 - gray;
+          }
+          // gentle contrast stretch around midpoint 128
+          let contrasted = (gray - 128) * 1.45 + 128;
+          if (contrasted < 0) {
+            contrasted = 0;
+          }
+          if (contrasted > 255) {
+            contrasted = 255;
+          }
+          data[i] = contrasted;
+          data[i + 1] = contrasted;
+          data[i + 2] = contrasted;
+        }
+        ctx.putImageData(imageData, 0, 0);
+        resolve(canvas.toDataURL("image/png"));
+      } catch (err) {
+        resolve(dataUrl);
+      }
+    };
+    img.onerror = function () {
+      resolve(dataUrl);
+    };
+    img.src = dataUrl;
+  });
 }
 
 // run tesseract ocr on my screenshot to auto-fill the form
@@ -533,7 +597,8 @@ async function runScreenshotOcr() {
   }
 
   try {
-    const result = await window.Tesseract.recognize(appState.screenshotDataUrl, "eng");
+    const enhancedUrl = await preprocessImageForOcr(appState.screenshotDataUrl);
+    const result = await window.Tesseract.recognize(enhancedUrl, "eng");
     const extractedText = result.data.text;
     const rawBox = document.getElementById("raw-screen-text");
     if (rawBox) {
@@ -780,18 +845,41 @@ function initializeDashboardEvents() {
     });
   }
 
-  // listen for ctrl+v anywhere on the page to grab my snipping tool screenshot
+  // listen for ctrl+v anywhere on the page to grab screenshots or pasted tekion text
   window.addEventListener("paste", function (event) {
-    if (!event.clipboardData || !event.clipboardData.items) {
+    if (!event.clipboardData) {
       return;
     }
     const items = event.clipboardData.items;
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf("image") !== -1) {
-        const blob = items[i].getAsFile();
-        handleScreenshotBlob(blob);
+    if (items) {
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf("image") !== -1) {
+          const blob = items[i].getAsFile();
+          handleScreenshotBlob(blob);
+          event.preventDefault();
+          return;
+        }
+      }
+    }
+
+    // if pasting plain text outside an input box, extract customer fields right away
+    const activeEl = document.activeElement;
+    let isTypingField = false;
+    if (activeEl) {
+      const tag = activeEl.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") {
+        isTypingField = true;
+      }
+    }
+    if (!isTypingField) {
+      const pastedText = event.clipboardData.getData("text/plain");
+      if (pastedText && pastedText.trim() !== "") {
+        const rawBox = document.getElementById("raw-screen-text");
+        if (rawBox) {
+          rawBox.value = pastedText;
+        }
+        parseTekionOrAwpText(pastedText);
         event.preventDefault();
-        return;
       }
     }
   });
