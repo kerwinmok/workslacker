@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>The BMW Store &amp; Rolls-Royce | Service Desk</title>
+  <title>The BMW Store, MINI &amp; Rolls-Royce | Service Desk</title>
   <link rel="stylesheet" href="style.css" />
   <!-- tesseract ocr so i can scan my tekion screenshots -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
@@ -19,7 +19,7 @@
         <span class="m-red"></span>
       </div>
       <div>
-        <h1>The BMW Store &amp; Rolls-Royce &mdash; Service Desk</h1>
+        <h1>The BMW Store, MINI &amp; Rolls-Royce &mdash; Service Desk</h1>
         <p class="subtitle">paste screenshot &bull; pick advisor &bull; copy email</p>
       </div>
     </div>
@@ -50,7 +50,7 @@
           <div id="paste-placeholder" class="paste-placeholder compact-placeholder">
             <p class="paste-title">press <strong>ctrl + v</strong> anywhere to paste screenshot or copied text</p>
             <p class="paste-desc">
-              auto-fills customer name, customer #, phone, and bmw/rolls-royce vin from tekion / awp.
+              auto-fills customer name, customer #, phone, and bmw/mini/rolls-royce vin from tekion / awp.
             </p>
             <label for="file-upload-input" class="btn btn-secondary btn-small">
               choose image file
@@ -101,9 +101,9 @@
           </div>
 
           <div class="field-group">
-            <label for="customer-vin">vin (bmw / rolls-royce)</label>
+            <label for="customer-vin">vin (bmw / mini / rolls-royce)</label>
             <div class="input-with-action">
-              <input type="text" id="customer-vin" placeholder="WBA... or SCA..." autocomplete="off" />
+              <input type="text" id="customer-vin" placeholder="WBA..., WMW..., or SCA..." autocomplete="off" />
               <button type="button" id="copy-last7-btn" class="btn btn-accent btn-small" title="copy last 7 for awp">
                 last 7
               </button>
@@ -157,7 +157,7 @@
         </div>
 
         <div id="service-chips-wrapper" class="field-group">
-          <label>quick bmw &amp; rolls-royce services</label>
+          <label>quick bmw, mini &amp; rolls-royce services</label>
           <div id="service-chips" class="chip-container">
             <button type="button" class="chip service-chip" data-service="Oil Service">Oil Service</button>
             <button type="button" class="chip service-chip" data-service="Brake Fluid Flush">Brake Fluid Flush</button>

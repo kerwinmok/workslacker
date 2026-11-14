@@ -23,6 +23,12 @@ const DEFAULT_CC_LIST = [
 // my default email sign-off
 const DEFAULT_SIGNATURE = "Thank you,\nKerwin\nService Coordinator | The BMW Store";
 
+// shared vin prefixes (bmw, mini, and rolls-royce) and text parsing regexes
+const KNOWN_VIN_PREFIXES = ["WBA", "WBS", "WBY", "WBW", "WMW", "WMZ", "5UX", "5YM", "3MW", "4US", "SCA", "SBA"];
+const NON_NAME_WORD_REGEX = /\b(ave|avenue|st|street|rd|road|blvd|drive|dr|hwy|suite|unit|apt|bmw|rolls|royce|ghost|phantom|cullinan|spectre|wraith|dawn|mini|cooper|countryman|clubman|paceman|jcw|hardtop|convertible|aceman|tekion|awp|customer|client|odometer|mileage|km|mi|status|active|inactive|pending|service|appointment|advisor|vin|ro|repair|order|year|model|vehicle|plate|license)\b/i;
+const PHONE_EXTRACT_REGEX = /(?:^|[^0-9A-Za-z])((?:\+?1[-.\s\u2013\u2014]*)?[\[(]?[2-9][0-9]{2}[\])]?[-.\s\u2013\u2014]*[0-9]{3}[-.\s\u2013\u2014]*[0-9]{4})(?![0-9])/;
+const PHONE_SCRUB_REGEX = /(?:^|[^0-9A-Za-z])(?:\+?1[-.\s\u2013\u2014]*)?[\[(]?[2-9][0-9]{2}[\])]?[-.\s\u2013\u2014]*[0-9]{3}[-.\s\u2013\u2014]*[0-9]{4}(?![0-9])/g;
+
 // keeps track of what i currently have selected on the screen
 const appState = {
   mode: "quote",
@@ -573,7 +579,6 @@ function extractAndCleanVin(rawText) {
     return result;
   }
 
-  const knownPrefixes = ["WBA", "WBS", "WBY", "WBW", "WMW", "5UX", "5YM", "3MW", "4US", "SCA", "SBA"];
   let fallback17 = "";
   let labeledShort = "";
 
@@ -586,7 +591,7 @@ function extractAndCleanVin(rawText) {
     if (clean17 !== "") {
       result.matchedTokens.push(rawCandidate);
       const prefix = clean17.slice(0, 3);
-      if (knownPrefixes.indexOf(prefix) !== -1) {
+      if (KNOWN_VIN_PREFIXES.indexOf(prefix) !== -1) {
         result.vin = clean17;
         return result;
       }
@@ -612,7 +617,7 @@ function extractAndCleanVin(rawText) {
     if (cleaned !== "") {
       result.matchedTokens.push(rawToken);
       const prefix = cleaned.slice(0, 3);
-      if (knownPrefixes.indexOf(prefix) !== -1) {
+      if (KNOWN_VIN_PREFIXES.indexOf(prefix) !== -1) {
         result.vin = cleaned;
         return result;
       }
@@ -679,7 +684,7 @@ function isAcceptableCustomerNumber(rawWithWrapper, explicitContext) {
 
 // reject vehicle labels, street addresses, and crm column headers mistaken for a customer name
 function isNonCustomerNameText(text) {
-  return /\b(ave|avenue|st|street|rd|road|blvd|drive|dr|hwy|suite|unit|apt|bmw|rolls|royce|ghost|phantom|cullinan|spectre|wraith|dawn|mini|cooper|tekion|awp|customer|client|odometer|mileage|km|mi|status|active|inactive|pending|service|appointment|advisor|vin|ro|repair|order|year|model|vehicle|plate|license)\b/i.test(text);
+  return NON_NAME_WORD_REGEX.test(text);
 }
 
 // clean up all-caps names from tekion (e.g. SMITH, JOHN -> John Smith)
@@ -791,8 +796,7 @@ function formatPhoneNumber(rawPhone) {
 
 // find the first phone match in pasted or ocr text and return formatted value + raw token
 function extractPhoneFromText(rawText) {
-  const phonePattern = /(?:^|[^0-9A-Za-z])((?:\+?1[-.\s\u2013\u2014]*)?[\[(]?[2-9][0-9]{2}[\])]?[-.\s\u2013\u2014]*[0-9]{3}[-.\s\u2013\u2014]*[0-9]{4})(?![0-9])/;
-  const match = rawText.match(phonePattern);
+  const match = rawText.match(PHONE_EXTRACT_REGEX);
   if (!match) {
     return null;
   }
@@ -845,7 +849,7 @@ function parseTekionOrAwpText(rawText) {
   let scrubbedText = rawText
     .replace(/\S+@\S+\.\S+/g, " ")
     .replace(/\b[A-HJ-NPR-Z0-9]{17}\b/gi, " ")
-    .replace(/(?:^|[^0-9A-Za-z])(?:\+?1[-.\s\u2013\u2014]*)?[\[(]?[2-9][0-9]{2}[\])]?[-.\s\u2013\u2014]*[0-9]{3}[-.\s\u2013\u2014]*[0-9]{4}(?![0-9])/g, " ");
+    .replace(PHONE_SCRUB_REGEX, " ");
 
   for (let v = 0; v < vinInfo.matchedTokens.length; v++) {
     const rawVinToken = vinInfo.matchedTokens[v];
