@@ -2,6 +2,20 @@
 
 i built this tool to speed up my daily workflow at the bmw, mini & rolls-royce service desk (all three brands share the same service advisors). instead of re-typing customer info into email templates while taking calls and jumping between tekion and awp, i launch one app off my usb drive, paste a screenshot or customer info, type the problem, and copy the email straight into outlook.
 
+## screenshots
+
+### service desk dashboard
+![Service Desk Dashboard](docs/images/dashboard-view.png)
+
+### advisors, cc & portable usb sync
+![Advisors & USB Settings](docs/images/settings-view.png)
+
+## how it works
+
+1. **clipboard ocr & text parser (`app.js`):** hitting `ctrl + v` with an image boosts screenshot contrast on a hidden canvas, runs tesseract.js ocr, and passes the extracted text through `parseTekionOrAwpText` (or parses raw pasted text directly). it cleans common vin ocr mistakes (`O`/`Q` -> `0`, `I` -> `1`), normalizes phone formats to `XXX-XXX-XXXX`, and splits variable-length customer numbers (including brackets, hyphens, or `#`) from customer names while ignoring model years and street lines.
+2. **awp & advisor formatting:** calculates `awp last 7 digits` live from any full 17-character bmw (`WBA...`), mini (`WMW...`, `WMZ...`), or rolls-royce (`SCA...`) vin and rebuilds `To`, `CC`, `Subject`, and the editable email body on every input or chip toggle.
+3. **portable usb storage (`workslacker.bat` & `advisors-config.js`):** running `workslacker.bat` launches a hidden powershell tcp server on `127.0.0.1` paired with edge/chrome `--app` mode so edits to advisors, cc presets, or the signature auto-save straight back to `advisors.json` and `advisors-config.js` on the usb drive.
+
 ## one-click usb launch
 1. copy this folder onto a usb drive.
 2. double-click **`workslacker.bat`**.
