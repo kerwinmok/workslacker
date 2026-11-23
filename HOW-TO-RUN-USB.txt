@@ -1,0 +1,55 @@
+WORKSLACKER - USB QUICK START & TROUBLESHOOTING GUIDE
+====================================================
+
+1. NORMAL LAUNCH (RECOMMENDED)
+------------------------------
+1) Plug in your USB drive and open the "workslacker" folder.
+2) Double-click:  workslacker.bat
+   - This starts a hidden local server on 127.0.0.1 (ports 8765-8785)
+     and automatically opens the app in Google Chrome.
+   - Any changes to Advisors or Quick CC contacts auto-save straight
+     back to advisors.json and advisors-config.js on the USB drive.
+3) Optional regular Chrome tab:
+   - After running workslacker.bat, double-click:  open-workslacker.html
+   - It automatically detects whichever port (8765-8785) the server is
+     running on and opens it directly in Chrome.
+
+
+2. IF ANYTHING GOES WRONG / TROUBLESHOOTING
+-------------------------------------------
+* Double-clicked workslacker.bat and nothing popped up:
+  - Double-click open-workslacker.html to jump straight to the running
+    server in Chrome, OR open Chrome and go to:
+      http://127.0.0.1:8765/   (or try 8766 if 8765 was busy)
+
+* Work PC blocks .bat files or PowerShell:
+  - Double-click:  index.html
+  - Opens directly in Chrome over file:// with zero server needed.
+  - Saved advisors and CC presets still load from advisors-config.js.
+  - If you edit advisors here, open "advisors & cc" (Settings) and click
+    "save advisors-config.js" to overwrite advisors-config.js on the USB.
+
+* Work PC blocks running files from USB completely:
+  - Open Chrome and go to:  https://kerwinmok.github.io/workslacker/
+  - Open "advisors & cc" and use "import json" to load advisors.json
+    from your USB (your browser will also remember them in localStorage).
+
+* App shows an old version after an update:
+  - Press Ctrl + F5 in Chrome to force a fresh reload.
+
+* Pulling latest updates from GitHub onto the USB:
+  - Open a terminal inside the USB workslacker folder and run:
+      git pull
+  - If Git shows a "dubious ownership" warning on a USB/exFAT drive, run
+    (adjust drive letter if your USB is not D:):
+      git config --global --add safe.directory D:/workslacker
+  - Or download the latest ZIP directly from:
+      https://github.com/kerwinmok/workslacker
+
+
+3. SAFE USB EJECTION
+--------------------
+- workslacker.bat runs from %TEMP%, so it does not lock your USB drive.
+- Note: While the local server is still running in the background after
+  ejecting the USB, saving new advisor edits to USB won't work until
+  the USB is plugged back in or you relaunch workslacker.bat.
