@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Opening Workslacker...</title>
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0d1117;
+      color: #e6edf3;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    }
+    .launcher-card {
+      width: min(420px, 90vw);
+      padding: 28px 24px;
+      border-radius: 12px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      text-align: center;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 1.15rem;
+      font-weight: 600;
+    }
+    p {
+      margin: 0 0 18px;
+      font-size: 0.92rem;
+      color: #9da7b3;
+    }
+    .links {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    a {
+      display: inline-block;
+      padding: 8px 14px;
+      border-radius: 8px;
+      background: #1f6feb;
+      color: #ffffff;
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+    a.secondary {
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+    }
+  </style>
+</head>
+<body>
+  <main class="launcher-card">
+    <h1>Opening Workslacker...</h1>
+    <p id="launch-status">Looking for local USB server on 127.0.0.1 (ports 8765&ndash;8785)...</p>
+    <div class="links">
+      <a href="http://127.0.0.1:8765/">Open http://127.0.0.1:8765/</a>
+      <a class="secondary" href="./index.html">Open Standalone (index.html)</a>
+    </div>
+  </main>
+
+  <script>
+    (async function () {
+      const statusEl = document.getElementById("launch-status");
+
+      async function probePort(port) {
+        const controller = typeof AbortController === "function" ? new AbortController() : null;
+        const timerId = controller ? setTimeout(function () { controller.abort(); }, 600) : null;
+        try {
+          const resp = await fetch("http://127.0.0.1:" + port + "/api/ping", {
+            cache: "no-store",
+            signal: controller ? controller.signal : undefined
+          });
+          if (!resp.ok) {
+            return null;
+          }
+          const body = await resp.text();
+          if (body && body.indexOf("workslacker:") === 0) {
+            return port;
+          }
+          return null;
+        } catch (err) {
+          return null;
+        } finally {
+          if (timerId !== null) {
+            clearTimeout(timerId);
+          }
+        }
+      }
+
+      const fastPort = await probePort(8765);
+      if (fastPort !== null) {
+        window.location.replace("http://127.0.0.1:" + fastPort + "/");
+        return;
+      }
+
+      const extraPorts = [];
+      for (let p = 8766; p <= 8785; p++) {
+        extraPorts.push(probePort(p));
+      }
+      const results = await Promise.all(extraPorts);
+      let matchedPort = null;
+      for (let i = 0; i < results.length; i++) {
+        if (results[i] !== null) {
+          matchedPort = results[i];
+          break;
+        }
+      }
+
+      if (matchedPort !== null) {
+        window.location.replace("http://127.0.0.1:" + matchedPort + "/");
+        return;
+      }
+
+      if (statusEl) {
+        statusEl.textContent = "Local server not running — opening standalone index.html...";
+      }
+      window.location.replace("./index.html");
+    })();
+  </script>
+</body>
+</html>
