@@ -6,12 +6,18 @@ const STORAGE_KEYS = {
   THEME: "bmw_service_theme_v1"
 };
 
-// starter list of advisors before i customize them in settings
+// starter list of advisors and managers before i customize them in settings
 const DEFAULT_ADVISORS = [
-  { name: "Alex", email: "alex@thebmwstore.ca" },
-  { name: "Jordan", email: "jordan@thebmwstore.ca" },
-  { name: "Chris", email: "chris@thebmwstore.ca" },
-  { name: "Taylor", email: "taylor@thebmwstore.ca" }
+  { name: "David Kung", email: "" },
+  { name: "Ken Chao", email: "" },
+  { name: "Philip Chen", email: "" },
+  { name: "Kreig Barker", email: "" },
+  { name: "Jack Pagtalunan", email: "" },
+  { name: "Quentin Pink", email: "" },
+  { name: "Jason Mah", email: "" },
+  { name: "Jason Tabo", email: "" },
+  { name: "Martyn Marsh", email: "" },
+  { name: "Andrew McKinnon", email: "" }
 ];
 
 // starter list of quick cc contacts
@@ -368,7 +374,7 @@ function renderSettingsAdvisorList() {
     row.className = "advisor-row-item";
 
     const infoSpan = document.createElement("span");
-    infoSpan.textContent = advisor.name + " (" + advisor.email + ")";
+    infoSpan.textContent = advisor.email ? (advisor.name + " (" + advisor.email + ")") : advisor.name;
 
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
@@ -464,17 +470,19 @@ function updateEmailPreview() {
 
   const serviceDetails = getRequestedServicesText();
 
+  const subjectCustomer = customerNumber !== "" ? (customerNumber + " " + customerName) : customerName;
+
   let subjectLine = "";
   let openingLine = "";
 
   if (appState.mode === "quote") {
-    subjectLine = "Price Quote: " + customerName;
+    subjectLine = "PRICE QUOTE: " + subjectCustomer;
     openingLine = "Could you please provide a price quote for the request below?";
   } else if (appState.mode === "status") {
-    subjectLine = "Status Update: " + customerName;
+    subjectLine = "STATUS UPDATE: " + subjectCustomer;
     openingLine = "Could you please provide a status update for the customer below?";
   } else {
-    subjectLine = "Callback Request: " + customerName;
+    subjectLine = "CALLBACK: " + subjectCustomer;
     openingLine = "Could you please give the customer below a call back?";
   }
 
@@ -491,7 +499,7 @@ function updateEmailPreview() {
   }
 
   bodyLines.push("Phone Number: " + phoneNumber);
-  bodyLines.push("VIN (Last 7 / Full): " + vinValue);
+  bodyLines.push("VIN: " + vinValue);
   bodyLines.push("Problem / Service: " + serviceDetails);
   if (appState.signature && appState.signature.trim() !== "") {
     bodyLines.push("");
@@ -1979,8 +1987,8 @@ function initializeDashboardEvents() {
       }
       const nameVal = nameEl.value.trim();
       const emailVal = emailEl.value.trim();
-      if (nameVal === "" || emailVal === "") {
-        showToast("enter both advisor name and email.");
+      if (nameVal === "") {
+        showToast("enter advisor name.");
         return;
       }
       appState.advisors.push({ name: nameVal, email: emailVal });

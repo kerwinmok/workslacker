@@ -2,20 +2,44 @@
 window.USB_SAVED_CONFIG = {
   "advisors": [
     {
-      "name": "Alex",
-      "email": "alex@thebmwstore.ca"
+      "name": "David Kung",
+      "email": ""
     },
     {
-      "name": "Jordan",
-      "email": "jordan@thebmwstore.ca"
+      "name": "Ken Chao",
+      "email": ""
     },
     {
-      "name": "Chris",
-      "email": "chris@thebmwstore.ca"
+      "name": "Philip Chen",
+      "email": ""
     },
     {
-      "name": "Taylor",
-      "email": "taylor@thebmwstore.ca"
+      "name": "Kreig Barker",
+      "email": ""
+    },
+    {
+      "name": "Jack Pagtalunan",
+      "email": ""
+    },
+    {
+      "name": "Quentin Pink",
+      "email": ""
+    },
+    {
+      "name": "Jason Mah",
+      "email": ""
+    },
+    {
+      "name": "Jason Tabo",
+      "email": ""
+    },
+    {
+      "name": "Martyn Marsh",
+      "email": ""
+    },
+    {
+      "name": "Andrew McKinnon",
+      "email": ""
     }
   ],
   "ccList": [
