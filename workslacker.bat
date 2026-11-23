@@ -11,6 +11,23 @@ start "" powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -
 exit /b 0
 
 :fallback
+where chrome >nul 2>&1
+if not errorlevel 1 (
+  start "" chrome --app="%APP_URL_FILE%" --window-size=1360,860
+  exit /b 0
+)
+if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" (
+  start "" "%ProgramFiles%\Google\Chrome\Application\chrome.exe" --app="%APP_URL_FILE%" --window-size=1360,860
+  exit /b 0
+)
+if exist "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" (
+  start "" "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" --app="%APP_URL_FILE%" --window-size=1360,860
+  exit /b 0
+)
+if exist "%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe" (
+  start "" "%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe" --app="%APP_URL_FILE%" --window-size=1360,860
+  exit /b 0
+)
 where msedge >nul 2>&1
 if not errorlevel 1 (
   start "" msedge --app="%APP_URL_FILE%" --window-size=1360,860
@@ -22,14 +39,6 @@ if exist "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" (
 )
 if exist "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" (
   start "" "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" --app="%APP_URL_FILE%" --window-size=1360,860
-  exit /b 0
-)
-if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" (
-  start "" "%ProgramFiles%\Google\Chrome\Application\chrome.exe" --app="%APP_URL_FILE%" --window-size=1360,860
-  exit /b 0
-)
-if exist "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" (
-  start "" "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" --app="%APP_URL_FILE%" --window-size=1360,860
   exit /b 0
 )
 start "" "%WORKSLACKER_ROOT%index.html"
@@ -49,14 +58,14 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
 function Find-AppBrowser {
   $candidates = @(
-    "msedge.exe",
-    (Join-Path ${env:ProgramFiles(x86)} "Microsoft\Edge\Application\msedge.exe"),
-    (Join-Path $env:ProgramFiles "Microsoft\Edge\Application\msedge.exe"),
-    (Join-Path $env:LOCALAPPDATA "Microsoft\Edge\Application\msedge.exe"),
     "chrome.exe",
     (Join-Path $env:ProgramFiles "Google\Chrome\Application\chrome.exe"),
     (Join-Path ${env:ProgramFiles(x86)} "Google\Chrome\Application\chrome.exe"),
-    (Join-Path $env:LOCALAPPDATA "Google\Chrome\Application\chrome.exe")
+    (Join-Path $env:LOCALAPPDATA "Google\Chrome\Application\chrome.exe"),
+    "msedge.exe",
+    (Join-Path ${env:ProgramFiles(x86)} "Microsoft\Edge\Application\msedge.exe"),
+    (Join-Path $env:ProgramFiles "Microsoft\Edge\Application\msedge.exe"),
+    (Join-Path $env:LOCALAPPDATA "Microsoft\Edge\Application\msedge.exe")
   )
 
   foreach ($item in $candidates) {
@@ -79,10 +88,13 @@ function Start-AppWindow {
 
   $browserExe = Find-AppBrowser
   if ($browserExe -ne "") {
-    Start-Process -FilePath $browserExe -ArgumentList "--app=$TargetUrl", "--window-size=1360,860"
-  } else {
-    Start-Process -FilePath $TargetUrl
+    try {
+      Start-Process -FilePath $browserExe -ArgumentList "--app=$TargetUrl", "--window-size=1360,860"
+      return
+    } catch {
+    }
   }
+  Start-Process -FilePath $TargetUrl
 }
 
 function Test-ExistingServer {

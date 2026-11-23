@@ -28,5 +28,5 @@ window.USB_SAVED_CONFIG = {
       "email": "appointments@thebmwstore.ca"
     }
   ],
-  "signature": "Thank you,\nKerwin\nService Coordinator | The BMW Store"
+  "signature": ""
 };

@@ -20,14 +20,14 @@ const DEFAULT_CC_LIST = [
   { name: "BDC / Appointments", email: "appointments@thebmwstore.ca" }
 ];
 
-// my default email sign-off
-const DEFAULT_SIGNATURE = "Thank you,\nKerwin\nService Coordinator | The BMW Store";
+// my default email sign-off (empty by default since outlook already appends my signature)
+const DEFAULT_SIGNATURE = "";
 
 // shared vin prefixes (bmw, mini, and rolls-royce) and text parsing regexes
-const KNOWN_VIN_PREFIXES = ["WBA", "WBS", "WBY", "WBW", "WMW", "WMZ", "5UX", "5YM", "3MW", "4US", "SCA", "SBA"];
-const NON_NAME_WORD_REGEX = /\b(ave|avenue|st|street|rd|road|blvd|drive|dr|hwy|suite|unit|apt|bmw|rolls|royce|ghost|phantom|cullinan|spectre|wraith|dawn|mini|cooper|countryman|clubman|paceman|jcw|hardtop|convertible|aceman|tekion|awp|customer|client|odometer|mileage|km|mi|status|active|inactive|pending|service|appointment|advisor|vin|ro|repair|order|year|model|vehicle|plate|license)\b/i;
+const KNOWN_VIN_PREFIXES = ["WBA", "WBS", "WBY", "WBW", "WBX", "WMW", "WMZ", "5UX", "5YM", "5UM", "3MW", "3MF", "4US", "SCA", "SBA", "SCB", "SLA"];
+const NON_NAME_WORD_REGEX = /\b(ave|avenue|st|street|rd|road|blvd|drive|dr|hwy|suite|unit|apt|bmw|rolls|royce|ghost|phantom|cullinan|spectre|wraith|dawn|mini|cooper|countryman|clubman|paceman|jcw|hardtop|convertible|aceman|tekion|awp|customer|client|odometer|mileage|km|mi|status|active|inactive|pending|service|appointment|advisor|vin|ro|repair|order|year|model|vehicle|plate|license|invoiced|drop|off|dropoff|loaner|tech|assigned|notes|tag|notify|again|cancel|reschedule|edit|upcoming|last|visit|email|phone|door|sedan|coupe|suv|gran|touring|xdrive|sdrive|electric|hybrid|waiter|shuttle|valet)\b/i;
 const PHONE_EXTRACT_REGEX = /(?:^|[^0-9A-Za-z])((?:\+?1[-.\s\u2013\u2014]*)?[\[(]?[2-9][0-9]{2}[\])]?[-.\s\u2013\u2014]*[0-9]{3}[-.\s\u2013\u2014]*[0-9]{4})(?![0-9])/;
-const PHONE_SCRUB_REGEX = /(?:^|[^0-9A-Za-z])(?:\+?1[-.\s\u2013\u2014]*)?[\[(]?[2-9][0-9]{2}[\])]?[-.\s\u2013\u2014]*[0-9]{3}[-.\s\u2013\u2014]*[0-9]{4}(?![0-9])/g;
+const PHONE_SCRUB_REGEX = /(^|[^0-9A-Za-z])(?:\+?1[-.\s\u2013\u2014]*)?[\[(]?[2-9][0-9]{2}[\])]?[-.\s\u2013\u2014]*[0-9]{3}[-.\s\u2013\u2014]*[0-9]{4}(?![0-9])/g;
 
 // keeps track of what i currently have selected on the screen
 const appState = {
@@ -74,7 +74,7 @@ function applyConfigObject(cfg) {
   if (Array.isArray(cfg.ccList)) {
     appState.ccContacts = cfg.ccList;
   }
-  if (typeof cfg.signature === "string" && cfg.signature.trim() !== "") {
+  if (typeof cfg.signature === "string") {
     appState.signature = cfg.signature;
   }
   return true;
@@ -117,7 +117,7 @@ function loadSavedSettings() {
   }
 
   const savedSignature = localStorage.getItem(STORAGE_KEYS.SIGNATURE);
-  if (savedSignature !== null && savedSignature.trim() !== "") {
+  if (savedSignature !== null) {
     appState.signature = savedSignature;
   }
 
@@ -493,8 +493,10 @@ function updateEmailPreview() {
   bodyLines.push("Phone Number: " + phoneNumber);
   bodyLines.push("VIN (Last 7 / Full): " + vinValue);
   bodyLines.push("Problem / Service: " + serviceDetails);
-  bodyLines.push("");
-  bodyLines.push(appState.signature);
+  if (appState.signature && appState.signature.trim() !== "") {
+    bodyLines.push("");
+    bodyLines.push(appState.signature);
+  }
 
   const previewTo = document.getElementById("preview-to");
   const previewCc = document.getElementById("preview-cc");
@@ -547,6 +549,11 @@ function normalizeVinCandidate(rawToken, allowShort) {
     fixed = compact.replace(/[OQ]/g, "0").replace(/I/g, "1");
   }
 
+  // fix common leading 5 -> S ocr confusion on bmw usa prefixes (5UX, 5YM, 5UM)
+  if (fixed.length === 17 && rawDigitCount >= 2 && /^S(UX|YM|UM)/.test(fixed)) {
+    fixed = "5" + fixed.slice(1);
+  }
+
   const fixedDigitMatches = fixed.match(/[0-9]/g);
   let fixedDigitCount = 0;
   if (fixedDigitMatches) {
@@ -582,12 +589,13 @@ function extractAndCleanVin(rawText) {
   let fallback17 = "";
   let labeledShort = "";
 
-  // check explicit vin labels first (supports hyphenated vins and 7-char awp short vins)
-  const labeledRegex = /\bvin\s*(?:no\.?|num\.?|number|#)?\s*[:#=\-\u2013\u2014]*\s*([A-Z0-9]{3,}(?:[-][A-Z0-9]{2,})*)/gi;
+  // check explicit vin labels first (supports spaces/hyphens inside vins and 7-char awp short vins)
+  const labeledRegex = /\bvin\s*(?:no\.?|num\.?|number|#)?\s*[:#=\-\u2013\u2014]*\s*([A-Za-z0-9]{3,}(?:[ \t-][A-Za-z0-9]{2,})*)/gi;
   let labeledMatch = labeledRegex.exec(rawText);
   while (labeledMatch !== null) {
     const rawCandidate = labeledMatch[1];
-    const clean17 = normalizeVinCandidate(rawCandidate, false);
+    const compactCandidate = rawCandidate.replace(/[^a-zA-Z0-9]/g, "");
+    const clean17 = normalizeVinCandidate(compactCandidate.length > 17 ? compactCandidate.slice(0, 17) : rawCandidate, false);
     if (clean17 !== "") {
       result.matchedTokens.push(rawCandidate);
       const prefix = clean17.slice(0, 3);
@@ -626,6 +634,24 @@ function extractAndCleanVin(rawText) {
       }
     }
     tokenMatch = tokenRegex.exec(rawText);
+  }
+
+  // resilient scan anchored on known bmw/mini/rolls-royce prefixes when ocr glues icons or inserts stray spaces
+  const prefixScanRegex = /(?:WBA|WBS|WBY|WBW|WBX|WMW|WMZ|5UX|5YM|5UM|3MW|3MF|4US|SCA|SBA|SCB|SLA|SUX|SYM|SUM)[A-Za-z0-9 \t-]{14,22}/gi;
+  let prefixMatch = prefixScanRegex.exec(rawText);
+  while (prefixMatch !== null) {
+    const rawSpan = prefixMatch[0];
+    const compactSpan = rawSpan.replace(/[^A-Za-z0-9]/g, "");
+    if (compactSpan.length >= 17) {
+      const slice17 = compactSpan.slice(0, 17);
+      const cleanedPrefixVin = normalizeVinCandidate(slice17, false);
+      if (cleanedPrefixVin !== "" && KNOWN_VIN_PREFIXES.indexOf(cleanedPrefixVin.slice(0, 3)) !== -1) {
+        result.matchedTokens.push(rawSpan);
+        result.vin = cleanedPrefixVin;
+        return result;
+      }
+    }
+    prefixMatch = prefixScanRegex.exec(rawText);
   }
 
   if (fallback17 !== "") {
@@ -810,11 +836,171 @@ function extractPhoneFromText(rawText) {
   };
 }
 
+// strip leading 2-letter avatar circle initials like "(CF) Coni Farrell" or "SR Saied Rakhshandeh"
+function stripLeadingAvatarInitials(text) {
+  if (!text) {
+    return "";
+  }
+  return String(text).replace(/^[([{\s]*[A-Z]{2}[)\]}\s]+(?=[A-Z][a-z].*\s+[A-Z][a-z])/, "").trim();
+}
+
+// clean ocr icon artifacts from an unlabeled tekion name candidate and validate 2-4 capitalized words
+function extractCleanPersonNameCandidate(rawSegment) {
+  if (!rawSegment || /[A-Za-z0-9]@[A-Za-z0-9]/.test(rawSegment) || /\b(?:19|20)\d{2}\b/.test(rawSegment) || isNonCustomerNameText(rawSegment)) {
+    return "";
+  }
+
+  const tokens = String(rawSegment).trim().split(/\s+/);
+  while (tokens.length > 2 && !/^(?:[A-Za-z][a-z][A-Za-z'.-]+|[A-Z][a-z])$/.test(tokens[0])) {
+    tokens.shift();
+  }
+  while (tokens.length > 2) {
+    const lastTok = tokens[tokens.length - 1];
+    if (/[^A-Za-z'.-]/.test(lastTok) || /^[A-Za-z]$/.test(lastTok) || /^[A-Z]{2}$/.test(lastTok)) {
+      tokens.pop();
+    } else {
+      break;
+    }
+  }
+
+  const cleanedTokens = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i].replace(/^[^A-Za-z]+/, "").replace(/[^A-Za-z'.-]+$/, "");
+    if (t !== "") {
+      cleanedTokens.push(t);
+    }
+  }
+
+  const cand = cleanedTokens.join(" ").trim();
+  if (cand === "" || /\d|@|\//.test(cand) || isNonCustomerNameText(cand)) {
+    return "";
+  }
+
+  const words = cand.split(/\s+/);
+  if (words.length < 2 || words.length > 4) {
+    return "";
+  }
+
+  let longWordCount = 0;
+  let capCount = 0;
+  const fixedWords = [];
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    if (/^[a-z]$/.test(w)) {
+      return "";
+    }
+    if (/^(?:de|van|von|la|le|da|del)$/i.test(w)) {
+      fixedWords.push(w.toLowerCase());
+    } else if (/^[A-Za-z][A-Za-z'.-]{1,}$/.test(w)) {
+      longWordCount++;
+      if (/^[A-Z]/.test(w)) {
+        capCount++;
+        fixedWords.push(w);
+      } else {
+        fixedWords.push(w.charAt(0).toUpperCase() + w.slice(1));
+      }
+    } else if (/^[A-Z]\.?$/.test(w)) {
+      fixedWords.push(w);
+    } else {
+      return "";
+    }
+  }
+
+  if (longWordCount < 2 || capCount < 1) {
+    return "";
+  }
+
+  return normalizeCustomerName(fixedWords.join(" "));
+}
+
+// strip non-customer tokens (emails, vins, phones, RO#, Tag#, stock codes, mileage, dates) before matching name or customer #
+function scrubNonCustomerText(rawText, matchedVinTokens) {
+  let scrubbed = String(rawText || "")
+    .replace(/\S+@\S+\.\S+/g, " ")
+    .replace(/\b[A-HJ-NPR-Z0-9]{17}\b/gi, " ")
+    .replace(PHONE_SCRUB_REGEX, "$1 ")
+    .replace(/\bRO\s*#?\s*[:#=\-\u2013\u2014]*\s*\d[\d\-]*\b/gi, " ")
+    .replace(/\bRepair\s+Order\s*#?\s*[:#=\-\u2013\u2014]*\s*\d[\d\-]*\b/gi, " ")
+    .replace(/\bTag\s*#?\s*[:#=\-\u2013\u2014]*\s*\d[\d\-]*\b/gi, " ")
+    .replace(/\b[A-Z]{1,4}[-\u2013\u2014]\d{3,8}\b/g, " ")
+    .replace(/\b\d{1,3}(?:,\d{3})+\s*(?:km|mi|miles)?\b/gi, " ")
+    .replace(/\b\d+\s*(?:km|mi|miles)\b/gi, " ")
+    .replace(/\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b[^\r\n|]*/gi, " ")
+    .replace(/\b\d{1,2}:\d{2}\s*(?:AM|PM)?\b/gi, " ");
+
+  if (Array.isArray(matchedVinTokens)) {
+    for (let v = 0; v < matchedVinTokens.length; v++) {
+      const rawVinToken = matchedVinTokens[v];
+      if (rawVinToken) {
+        scrubbed = scrubbed.split(rawVinToken).join(" ");
+      }
+    }
+  }
+  return scrubbed;
+}
+
+// find the best unlabeled 2-4 word person name in scrubbed text, preferring lines adjacent to a phone number
+function findBestUnlabeledPersonName(rawBlock, scrubbedBlock, phoneInfo) {
+  const rawLines = String(rawBlock || "").split(/\r?\n/);
+  const phoneLineIndices = [];
+  if (phoneInfo && phoneInfo.rawToken) {
+    for (let r = 0; r < rawLines.length; r++) {
+      if (rawLines[r].indexOf(phoneInfo.rawToken) !== -1 || PHONE_EXTRACT_REGEX.test(rawLines[r])) {
+        phoneLineIndices.push(r);
+      }
+    }
+  }
+
+  let firstCandidate = "";
+  let phoneAdjacentCandidate = "";
+  const scrubbedLines = String(scrubbedBlock || "").split(/\r?\n/);
+  for (let i = 0; i < scrubbedLines.length; i++) {
+    const segments = scrubbedLines[i].split(/[|\t•]+/);
+    for (let s = 0; s < segments.length; s++) {
+      const candName = extractCleanPersonNameCandidate(segments[s]);
+      if (candName === "") {
+        continue;
+      }
+      if (firstCandidate === "") {
+        firstCandidate = candName;
+      }
+      for (let p = 0; p < phoneLineIndices.length; p++) {
+        if (Math.abs(i - phoneLineIndices[p]) <= 2) {
+          phoneAdjacentCandidate = candName;
+          break;
+        }
+      }
+      if (phoneAdjacentCandidate !== "") {
+        break;
+      }
+    }
+    if (phoneAdjacentCandidate !== "") {
+      break;
+    }
+  }
+
+  return phoneAdjacentCandidate !== "" ? phoneAdjacentCandidate : firstCandidate;
+}
+
 // pull out the vin, phone, customer #, and name from ocr or pasted tekion text
-function parseTekionOrAwpText(rawText) {
+function parseTekionOrAwpText(rawText, options) {
   if (!rawText || rawText.trim() === "") {
     showToast("no text found to parse.");
     return;
+  }
+
+  if (options && options.clearPrevious) {
+    const clearIds = ["customer-name", "customer-number", "customer-phone", "customer-vin"];
+    for (let c = 0; c < clearIds.length; c++) {
+      const clearEl = document.getElementById(clearIds[c]);
+      if (clearEl) {
+        clearEl.value = "";
+      }
+    }
+    const resetHelper = document.getElementById("vin-helper-text");
+    if (resetHelper) {
+      resetHelper.textContent = "paste full vin or 7 chars for awp";
+    }
   }
 
   let matchedCount = 0;
@@ -845,18 +1031,7 @@ function parseTekionOrAwpText(rawText) {
     }
   }
 
-  // strip already-detected phones, vins (including ocr-corrected tokens), and emails so they don't confuse name/id matching
-  let scrubbedText = rawText
-    .replace(/\S+@\S+\.\S+/g, " ")
-    .replace(/\b[A-HJ-NPR-Z0-9]{17}\b/gi, " ")
-    .replace(PHONE_SCRUB_REGEX, " ");
-
-  for (let v = 0; v < vinInfo.matchedTokens.length; v++) {
-    const rawVinToken = vinInfo.matchedTokens[v];
-    if (rawVinToken) {
-      scrubbedText = scrubbedText.split(rawVinToken).join(" ");
-    }
-  }
+  const scrubbedText = scrubNonCustomerText(rawText, vinInfo.matchedTokens);
 
   // look for explicit customer number label (allows 3-10 digits, brackets, hyphens, #)
   const custNumRegex = /(?:customer\s*(?:id|no\.?|num\.?|number|#)|cust\s*(?:id|no\.?|num\.?|number|#)|account\s*(?:id|no\.?|num\.?|number|#)|client\s*(?:id|no\.?|#))[ \t]*[:#=\-\u2013\u2014]*[ \t]*([#(\[]*[ \t]*\d+(?:[\-\u2013\u2014]\d+)*[ \t]*[)\]]*)/i;
@@ -869,9 +1044,16 @@ function parseTekionOrAwpText(rawText) {
   const nameRegex = /(?:customer\s*name|client\s*name|(?:customer|client)(?!\s*(?:id|no|num|number|#))|name)[ \t]*[:#-]+[ \t]*([^\r\n]+)/i;
   const nameMatch = scrubbedText.match(nameRegex);
   if (nameMatch) {
-    const splitLabeled = splitNameAndCustomerNumber(nameMatch[1]);
-    if (splitLabeled.name !== "" && !isNonCustomerNameText(splitLabeled.name)) {
-      foundName = splitLabeled.name;
+    const cleanedLabeledLine = nameMatch[1]
+      .split("|")[0]
+      .replace(/\s+(?:Vehicle|Phone|Email|VIN|Last\s+Visit|Appointment|Upcoming|Notify|Cancel|Edit|RO\s*#|Tag\s*#)\b.*/i, "")
+      .replace(/\s*\([^0-9)]{0,5}\)\s*$/g, "")
+      .replace(/\s*[^\w)\]]+\s*$/, "")
+      .trim();
+    const splitLabeled = splitNameAndCustomerNumber(cleanedLabeledLine);
+    const cleanedLabeledName = stripLeadingAvatarInitials(splitLabeled.name);
+    if (cleanedLabeledName !== "" && !isNonCustomerNameText(cleanedLabeledName)) {
+      foundName = cleanedLabeledName;
     }
     if (splitLabeled.customerNumber !== "" && foundCustNum === "") {
       foundCustNum = splitLabeled.customerNumber;
@@ -892,11 +1074,12 @@ function parseTekionOrAwpText(rawText) {
           continue;
         }
         const segSplit = splitNameAndCustomerNumber(seg);
-        if (segSplit.name !== "" && segSplit.customerNumber !== "") {
-          const wordCount = segSplit.name.split(/\s+/).length;
+        const segName = stripLeadingAvatarInitials(segSplit.name);
+        if (segName !== "" && segSplit.customerNumber !== "") {
+          const wordCount = segName.split(/\s+/).length;
           if (wordCount >= 1 && wordCount <= 4) {
             if (foundName === "") {
-              foundName = segSplit.name;
+              foundName = segName;
             }
             if (foundCustNum === "") {
               foundCustNum = segSplit.customerNumber;
@@ -911,30 +1094,14 @@ function parseTekionOrAwpText(rawText) {
     }
   }
 
-  // fallback: check bracketed or #-prefixed customer numbers first, then standalone 3-10 digit tokens
-  if (foundCustNum === "") {
-    const markedIdRegex = /(\(\s*\d+(?:[\-\u2013\u2014]\d+)*\s*\)|\[\s*\d+(?:[\-\u2013\u2014]\d+)*\s*\]|#\s*\d+(?:[\-\u2013\u2014]\d+)*)/g;
-    let markedMatch = markedIdRegex.exec(scrubbedText);
-    while (markedMatch !== null) {
-      if (isAcceptableCustomerNumber(markedMatch[1], false)) {
-        foundCustNum = cleanCustomerNumberToken(markedMatch[1]);
-        break;
-      }
-      markedMatch = markedIdRegex.exec(scrubbedText);
+  // fallback for unlabeled tekion RO header bars: prioritize rightmost banner column if available, then scan full text
+  if (foundName === "") {
+    if (options && options.preferredNameText) {
+      const preferredScrubbed = scrubNonCustomerText(options.preferredNameText, vinInfo.matchedTokens);
+      foundName = findBestUnlabeledPersonName(options.preferredNameText, preferredScrubbed, phoneInfo);
     }
-  }
-
-  if (foundCustNum === "") {
-    const looseIdRegex = /\b(\d+(?:[\-\u2013\u2014]\d+)*)\b/g;
-    let looseMatch = looseIdRegex.exec(scrubbedText);
-    while (looseMatch !== null) {
-      const trailingTail = scrubbedText.slice(looseMatch.index + looseMatch[0].length, looseMatch.index + looseMatch[0].length + 20);
-      const isMeasurementOrStreet = /^[ \t]*(?:km|mi|miles|ave|avenue|st|street|rd|road|blvd|drive|dr)\b/i.test(trailingTail);
-      if (!isMeasurementOrStreet && isAcceptableCustomerNumber(looseMatch[1], false)) {
-        foundCustNum = cleanCustomerNumberToken(looseMatch[1]);
-        break;
-      }
-      looseMatch = looseIdRegex.exec(scrubbedText);
+    if (foundName === "") {
+      foundName = findBestUnlabeledPersonName(rawText, scrubbedText, phoneInfo);
     }
   }
 
@@ -999,46 +1166,112 @@ function handleScreenshotBlob(blob) {
   reader.readAsDataURL(blob);
 }
 
-// upscale small tekion snips and boost contrast so tesseract reads numbers and vins accurately
+// pad a canvas region with solid white borders so tesseract reads edge characters cleanly
+function buildPaddedColumnDataUrl(sourceCanvas, startX, width, height, pad) {
+  const colCanvas = document.createElement("canvas");
+  colCanvas.width = width + pad * 2;
+  colCanvas.height = height + pad * 2;
+  const colCtx = colCanvas.getContext("2d");
+  if (!colCtx) {
+    return "";
+  }
+  colCtx.fillStyle = "#ffffff";
+  colCtx.fillRect(0, 0, colCanvas.width, colCanvas.height);
+  colCtx.drawImage(sourceCanvas, startX, 0, width, height, pad, pad, width, height);
+  return colCanvas.toDataURL("image/png");
+}
+
+// detect full-height gray vertical divider lines inside wide short banners
+function detectVerticalBannerDividers(rawGray, width, height, scale) {
+  const dividers = [];
+  const yStart = Math.floor(height * 0.1);
+  const yEnd = Math.ceil(height * 0.9);
+  const sampleRows = Math.max(1, yEnd - yStart);
+  const xMin = Math.floor(width * 0.05);
+  const xMax = Math.ceil(width * 0.95);
+  const minGap = Math.max(80 * scale, Math.floor(width * 0.14));
+
+  for (let x = xMin; x < xMax; x++) {
+    let grayCount = 0;
+    let sum = 0;
+    for (let y = yStart; y < yEnd; y++) {
+      const g = rawGray[y * width + x];
+      sum += g;
+      if (g >= 140 && g <= 240) {
+        grayCount++;
+      }
+    }
+    const avg = sum / sampleRows;
+    if (grayCount / sampleRows >= 0.7 && avg < 242) {
+      if (dividers.length === 0 || x - dividers[dividers.length - 1] >= minGap) {
+        dividers.push(x);
+      }
+    }
+  }
+  return dividers;
+}
+
+// upscale small tekion snips, pad edges, split wide banners into columns, and boost contrast gently
 function preprocessImageForOcr(dataUrl) {
   return new Promise(function (resolve) {
     const img = new Image();
     img.onload = function () {
       try {
         let scale = 1;
-        if (img.width < 1200) {
+        if (img.height < 120) {
+          scale = Math.min(4, Math.max(3, Math.ceil(220 / img.height)));
+          const maxScaleForWidth = Math.floor(3600 / img.width) || 1;
+          scale = Math.max(1, Math.min(scale, maxScaleForWidth));
+        } else if (img.width < 1200 || img.height < 400) {
           scale = 2;
         }
-        const canvas = document.createElement("canvas");
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          resolve(dataUrl);
+
+        const scaledW = img.width * scale;
+        const scaledH = img.height * scale;
+        const pad = 24;
+
+        const workCanvas = document.createElement("canvas");
+        workCanvas.width = scaledW;
+        workCanvas.height = scaledH;
+        const workCtx = workCanvas.getContext("2d");
+        if (!workCtx) {
+          resolve({ fullDataUrl: dataUrl, columnDataUrls: [] });
           return;
         }
-        ctx.imageSmoothingEnabled = true;
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        workCtx.imageSmoothingEnabled = true;
+        workCtx.imageSmoothingQuality = "high";
+        workCtx.drawImage(img, 0, 0, scaledW, scaledH);
 
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const imageData = workCtx.getImageData(0, 0, scaledW, scaledH);
         const data = imageData.data;
+        const pixelCount = data.length / 4;
+        const rawGray = new Float32Array(pixelCount);
+
         let brightnessTotal = 0;
-        for (let i = 0; i < data.length; i = i + 4) {
+        for (let p = 0; p < pixelCount; p++) {
+          const i = p * 4;
           const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+          rawGray[p] = gray;
           brightnessTotal = brightnessTotal + gray;
         }
-        const pixelCount = data.length / 4;
         const avgBrightness = brightnessTotal / pixelCount;
         // invert dark-mode screenshots so tesseract always reads dark text on a light background
         const isDarkBackground = avgBrightness < 115;
-
-        for (let i = 0; i < data.length; i = i + 4) {
-          let gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-          if (isDarkBackground) {
-            gray = 255 - gray;
+        if (isDarkBackground) {
+          for (let p = 0; p < pixelCount; p++) {
+            rawGray[p] = 255 - rawGray[p];
           }
-          // gentle contrast stretch around midpoint 128
-          let contrasted = (gray - 128) * 1.45 + 128;
+        }
+
+        let dividers = [];
+        if (img.width / img.height >= 3.2) {
+          dividers = detectVerticalBannerDividers(rawGray, scaledW, scaledH, scale);
+        }
+
+        // gentle contrast stretch around midpoint 128 so thin strokes (like n/i) stay separated
+        for (let p = 0; p < pixelCount; p++) {
+          const i = p * 4;
+          let contrasted = (rawGray[p] - 128) * 1.32 + 128;
           if (contrasted < 0) {
             contrasted = 0;
           }
@@ -1049,17 +1282,130 @@ function preprocessImageForOcr(dataUrl) {
           data[i + 1] = contrasted;
           data[i + 2] = contrasted;
         }
-        ctx.putImageData(imageData, 0, 0);
-        resolve(canvas.toDataURL("image/png"));
+        workCtx.putImageData(imageData, 0, 0);
+
+        const paddedCanvas = document.createElement("canvas");
+        paddedCanvas.width = scaledW + pad * 2;
+        paddedCanvas.height = scaledH + pad * 2;
+        const paddedCtx = paddedCanvas.getContext("2d");
+        let fullDataUrl = dataUrl;
+        if (paddedCtx) {
+          paddedCtx.fillStyle = "#ffffff";
+          paddedCtx.fillRect(0, 0, paddedCanvas.width, paddedCanvas.height);
+          paddedCtx.drawImage(workCanvas, pad, pad);
+          fullDataUrl = paddedCanvas.toDataURL("image/png");
+        } else {
+          fullDataUrl = workCanvas.toDataURL("image/png");
+        }
+
+        const columnDataUrls = [];
+        if (dividers.length >= 1) {
+          const bounds = [0].concat(dividers, [scaledW]);
+          const trimEdge = 4 * scale;
+          for (let b = 0; b < bounds.length - 1; b++) {
+            const left = bounds[b] + (b === 0 ? 0 : trimEdge);
+            const right = bounds[b + 1] - (b === bounds.length - 2 ? 0 : trimEdge);
+            const sliceW = right - left;
+            if (sliceW >= 60 * scale) {
+              const colUrl = buildPaddedColumnDataUrl(workCanvas, left, sliceW, scaledH, pad);
+              if (colUrl !== "") {
+                columnDataUrls.push(colUrl);
+              }
+            }
+          }
+        }
+
+        resolve({
+          fullDataUrl: fullDataUrl,
+          columnDataUrls: columnDataUrls.length >= 2 ? columnDataUrls : []
+        });
       } catch (err) {
-        resolve(dataUrl);
+        resolve({ fullDataUrl: dataUrl, columnDataUrls: [] });
       }
     };
     img.onerror = function () {
-      resolve(dataUrl);
+      resolve({ fullDataUrl: dataUrl, columnDataUrls: [] });
     };
     img.src = dataUrl;
   });
+}
+
+// collect line objects from tesseract v5 data whether exposed via data.lines or data.blocks
+function collectOcrLines(data) {
+  if (!data) {
+    return [];
+  }
+  if (Array.isArray(data.lines) && data.lines.length > 0) {
+    return data.lines;
+  }
+  const collected = [];
+  if (Array.isArray(data.blocks)) {
+    for (let b = 0; b < data.blocks.length; b++) {
+      const paras = data.blocks[b] && data.blocks[b].paragraphs;
+      if (!Array.isArray(paras)) {
+        continue;
+      }
+      for (let p = 0; p < paras.length; p++) {
+        const lines = paras[p] && paras[p].lines;
+        if (!Array.isArray(lines)) {
+          continue;
+        }
+        for (let l = 0; l < lines.length; l++) {
+          collected.push(lines[l]);
+        }
+      }
+    }
+  }
+  return collected;
+}
+
+// rebuild ocr lines while inserting " | " across wide horizontal column gaps
+function extractStructuredTextFromOcrData(data) {
+  if (!data) {
+    return "";
+  }
+  const lines = collectOcrLines(data);
+  if (lines.length === 0) {
+    return data.text || "";
+  }
+
+  const outLines = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (Array.isArray(line.words) && line.words.length > 0) {
+      let lineHeight = 16;
+      if (line.bbox && typeof line.bbox.y1 === "number" && typeof line.bbox.y0 === "number") {
+        lineHeight = Math.max(10, line.bbox.y1 - line.bbox.y0);
+      }
+      const gapThreshold = Math.max(32, lineHeight * 2.2);
+      let lineStr = "";
+      for (let w = 0; w < line.words.length; w++) {
+        const word = line.words[w];
+        const wordText = word && word.text ? String(word.text).trim() : "";
+        if (wordText === "") {
+          continue;
+        }
+        if (lineStr === "") {
+          lineStr = wordText;
+        } else {
+          const prev = line.words[w - 1];
+          const hasBoxes = prev && prev.bbox && word.bbox && typeof prev.bbox.x1 === "number" && typeof word.bbox.x0 === "number";
+          const gap = hasBoxes ? (word.bbox.x0 - prev.bbox.x1) : 0;
+          lineStr = lineStr + (gap > gapThreshold ? " | " : " ") + wordText;
+        }
+      }
+      if (lineStr !== "") {
+        outLines.push(lineStr);
+      }
+    } else if (line.text && String(line.text).trim() !== "") {
+      outLines.push(String(line.text).trim());
+    }
+  }
+
+  if (outLines.length > 0) {
+    return outLines.join("\n");
+  }
+  return data.text || "";
 }
 
 // run tesseract ocr on my screenshot to auto-fill the form
@@ -1086,12 +1432,38 @@ async function runScreenshotOcr() {
     statusText.textContent = "scanning screenshot with ocr... please wait a moment.";
   }
 
+  let worker = null;
   try {
-    const enhancedUrl = await preprocessImageForOcr(appState.screenshotDataUrl);
-    const result = await window.Tesseract.recognize(enhancedUrl, "eng");
-    const extractedText = result.data.text;
-    parseTekionOrAwpText(extractedText);
+    const prep = await preprocessImageForOcr(appState.screenshotDataUrl);
+    let combinedText = "";
+    let preferredNameText = "";
+
+    if (prep.columnDataUrls.length >= 2) {
+      if (typeof window.Tesseract.createWorker === "function") {
+        worker = await window.Tesseract.createWorker("eng");
+      }
+      const colTexts = [];
+      for (let c = 0; c < prep.columnDataUrls.length; c++) {
+        const res = worker
+          ? await worker.recognize(prep.columnDataUrls[c])
+          : await window.Tesseract.recognize(prep.columnDataUrls[c], "eng");
+        const colText = extractStructuredTextFromOcrData(res.data);
+        if (colText.trim() !== "") {
+          colTexts.push(colText);
+        }
+      }
+      if (colTexts.length > 0) {
+        preferredNameText = colTexts[colTexts.length - 1];
+      }
+      combinedText = colTexts.join("\n");
+    } else {
+      const result = await window.Tesseract.recognize(prep.fullDataUrl, "eng");
+      combinedText = extractStructuredTextFromOcrData(result.data);
+    }
+
+    parseTekionOrAwpText(combinedText, { clearPrevious: true, preferredNameText: preferredNameText });
     if (statusText) {
+      statusText.setAttribute("data-last-ocr", combinedText.slice(0, 600));
       statusText.textContent = "ocr done — verify fields below.";
     }
   } catch (err) {
@@ -1099,6 +1471,13 @@ async function runScreenshotOcr() {
       statusText.textContent = "ocr scan encountered an error. you can still copy the screenshot with your email.";
     }
   } finally {
+    if (worker && typeof worker.terminate === "function") {
+      try {
+        await worker.terminate();
+      } catch (terminateErr) {
+        // ignore cleanup errors
+      }
+    }
     if (ocrBtn) {
       ocrBtn.disabled = false;
     }
