@@ -42,6 +42,13 @@ if work IT restricts `.bat` files, powershell, or usb execution, there are five 
 2. **pick advisor, cc & problem:** the first advisor starts selected automatically (shared across bmw, mini, and rolls-royce), or i click a different advisor pill, add any cc contacts, click quick bmw/mini/rolls-royce service chips, and type the problem notes.
 3. **copy into outlook:** `To`, `CC`, `Subject`, and the tailored `Email Body` update live with one-click copy buttons (`copy to`, `copy cc`, `copy subject`, `copy email body`, `copy body + screenshot`).
 
+## reusable email templates and quick picks
+- choose a saved template from the service desk or search by name/category, then click **fill** to populate the subject and body.
+- use **save current email as template** or **advisors & cc → new template** to create one; edit, fill, and delete saved templates in the settings list.
+- templates support `{{customerName}}`, `{{customerNumber}}`, `{{customerNumberLine}}`, `{{customerPhone}}`, `{{vin}}`, `{{advisorName}}`, `{{serviceDetails}}`, `{{customerAndNumber}}`, and `{{signature}}`. the body is stored as plain text with line breaks intact, then copied using the existing plain or rich email actions.
+- add, edit, search, and remove service or problem quick picks in settings. Categories can be managed there and assigned to templates and quick picks.
+- saved templates, services, and categories use browser `localStorage`; when launched with `workslacker.bat`, the same data is included in the portable `advisors.json` and `advisors-config.js` sync/export.
+
 ## repo files
 - `workslacker.bat` — single-click portable usb launcher + local config server (opens chrome first)
 - `open-workslacker.html` — chrome/browser launcher that finds the running `127.0.0.1` server or falls back to `index.html`

@@ -3,7 +3,10 @@ const STORAGE_KEYS = {
   ADVISORS: "bmw_service_advisors_v1",
   CC_LIST: "bmw_service_cc_v1",
   SIGNATURE: "bmw_service_signature_v1",
-  THEME: "bmw_service_theme_v1"
+  THEME: "bmw_service_theme_v1",
+  TEMPLATES: "bmw_service_templates_v1",
+  SERVICES: "bmw_service_services_v1",
+  CATEGORIES: "bmw_service_categories_v1"
 };
 
 // starter list of advisors and managers before i customize them in settings
@@ -29,6 +32,31 @@ const DEFAULT_CC_LIST = [
 // my default email sign-off (empty by default since outlook already appends my signature)
 const DEFAULT_SIGNATURE = "";
 
+const DEFAULT_SERVICES = [
+  { name: "Oil Service", category: "Oil Change" },
+  { name: "Brake Fluid Flush", category: "Maintenance" },
+  { name: "Cabin Microfilter", category: "Maintenance" },
+  { name: "Engine Air Filter", category: "Maintenance" },
+  { name: "Vehicle Check Inspection", category: "Maintenance" },
+  { name: "Front Brakes (Pads & Rotors)", category: "Brakes" },
+  { name: "Rear Brakes (Pads & Rotors)", category: "Brakes" },
+  { name: "Four-Wheel Alignment", category: "Maintenance" },
+  { name: "Seasonal Tire Swap", category: "Tires" },
+  { name: "Spark Plugs Replacement", category: "Maintenance" },
+  { name: "Coolant Flush", category: "Maintenance" },
+  { name: "12V Battery Replacement", category: "Electrical" },
+  { name: "Warning Light / Diagnostics", category: "Diagnostics" }
+];
+
+const DEFAULT_CATEGORIES = ["Price Quote", "Oil Change", "Status Update", "Callback", "Maintenance", "Brakes", "Tires", "Diagnostics", "Electrical", "Customer Concern", "Other"];
+
+const DEFAULT_TEMPLATES = [
+  { id: "price-quote", name: "Price Quote", category: "Price Quote", subject: "PRICE QUOTE: {{customerAndNumber}}", body: "Hello {{advisorName}},\n\nCould you please provide a price quote for the request below?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nProblem / Service: {{serviceDetails}}\n\n{{signature}}" },
+  { id: "oil-change", name: "Oil Change", category: "Oil Change", subject: "OIL SERVICE: {{customerAndNumber}}", body: "Hello {{advisorName}},\n\nCould you please provide a price quote for an oil service?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nProblem / Service: {{serviceDetails}}\n\n{{signature}}" },
+  { id: "status-update", name: "Status Update", category: "Status Update", subject: "STATUS UPDATE: {{customerAndNumber}}", body: "Hello {{advisorName}},\n\nCould you please provide a status update for the customer below?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nProblem / Service: {{serviceDetails}}\n\n{{signature}}" },
+  { id: "callback", name: "Callback", category: "Callback", subject: "CALLBACK: {{customerAndNumber}}", body: "Hello {{advisorName}},\n\nCould you please give the customer below a call back?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nProblem / Service: {{serviceDetails}}\n\n{{signature}}" }
+];
+
 // shared vin prefixes (bmw, mini, and rolls-royce) and text parsing regexes
 const KNOWN_VIN_PREFIXES = ["WBA", "WBS", "WBY", "WBW", "WBX", "WMW", "WMZ", "5UX", "5YM", "5UM", "3MW", "3MF", "4US", "SCA", "SBA", "SCB", "SLA"];
 const NON_NAME_WORD_REGEX = /\b(ave|avenue|st|street|rd|road|blvd|drive|dr|hwy|suite|unit|apt|bmw|rolls|royce|ghost|phantom|cullinan|spectre|wraith|dawn|mini|cooper|countryman|clubman|paceman|jcw|hardtop|convertible|aceman|tekion|awp|customer|client|odometer|mileage|km|mi|status|active|inactive|pending|service|appointment|advisor|vin|ro|repair|order|year|model|vehicle|plate|license|invoiced|drop|off|dropoff|loaner|tech|assigned|notes|tag|notify|again|cancel|reschedule|edit|upcoming|last|visit|email|phone|door|sedan|coupe|suv|gran|touring|xdrive|sdrive|electric|hybrid|waiter|shuttle|valet)\b/i;
@@ -43,6 +71,12 @@ const appState = {
   selectedCcEmails: [],
   selectedAdvisorIndex: -1,
   selectedServices: [],
+  services: DEFAULT_SERVICES.slice(),
+  categories: DEFAULT_CATEGORIES.slice(),
+  templates: DEFAULT_TEMPLATES.map(function (template) { return Object.assign({}, template); }),
+  activeTemplateId: "",
+  previewEdited: false,
+  editingTemplateId: "",
   signature: DEFAULT_SIGNATURE,
   screenshotDataUrl: "",
   screenshotBlob: null
@@ -65,7 +99,10 @@ function buildConfigPayload() {
   return {
     advisors: appState.advisors,
     ccList: appState.ccContacts,
-    signature: appState.signature
+    signature: appState.signature,
+    services: appState.services,
+    categories: appState.categories,
+    templates: appState.templates
   };
 }
 
@@ -82,6 +119,17 @@ function applyConfigObject(cfg) {
   }
   if (typeof cfg.signature === "string") {
     appState.signature = cfg.signature;
+  }
+  if (Array.isArray(cfg.services)) {
+    appState.services = cfg.services.filter(function (item) {
+      return item && typeof item.name === "string" && typeof item.category === "string";
+    });
+  }
+  if (Array.isArray(cfg.categories)) appState.categories = cfg.categories.filter(function (item) { return typeof item === "string"; });
+  if (Array.isArray(cfg.templates)) {
+    appState.templates = cfg.templates.filter(function (item) {
+      return item && typeof item.id === "string" && typeof item.name === "string" && typeof item.subject === "string" && typeof item.body === "string";
+    });
   }
   return true;
 }
@@ -136,6 +184,23 @@ function loadSavedSettings() {
       themeBtn.textContent = "dark mode";
     }
   }
+
+  [["TEMPLATES", "templates"], ["SERVICES", "services"], ["CATEGORIES", "categories"]].forEach(function (keyPair) {
+    const raw = localStorage.getItem(STORAGE_KEYS[keyPair[0]]);
+    if (!raw) return;
+    try {
+      const value = JSON.parse(raw);
+      if (Array.isArray(value)) {
+        appState[keyPair[1]] = keyPair[1] === "services"
+          ? value.filter(function (item) { return item && typeof item.name === "string" && typeof item.category === "string"; })
+          : keyPair[1] === "templates"
+            ? value.filter(function (item) { return item && typeof item.id === "string" && typeof item.name === "string" && typeof item.subject === "string" && typeof item.body === "string"; })
+            : value.filter(function (item) { return typeof item === "string"; });
+      }
+    } catch (err) {
+      // keep the bundled defaults
+    }
+  });
 }
 
 // select an advisor by index and populate the to fields
@@ -174,6 +239,9 @@ async function syncConfigFromUsbServer() {
       localStorage.setItem(STORAGE_KEYS.ADVISORS, JSON.stringify(appState.advisors));
       localStorage.setItem(STORAGE_KEYS.CC_LIST, JSON.stringify(appState.ccContacts));
       localStorage.setItem(STORAGE_KEYS.SIGNATURE, appState.signature);
+      localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(appState.templates));
+      localStorage.setItem(STORAGE_KEYS.SERVICES, JSON.stringify(appState.services));
+      localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(appState.categories));
 
       const sigInput = document.getElementById("signature-input");
       if (sigInput) {
@@ -223,6 +291,9 @@ function saveSettingsToStorage() {
   localStorage.setItem(STORAGE_KEYS.ADVISORS, JSON.stringify(appState.advisors));
   localStorage.setItem(STORAGE_KEYS.CC_LIST, JSON.stringify(appState.ccContacts));
   localStorage.setItem(STORAGE_KEYS.SIGNATURE, appState.signature);
+  localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(appState.templates));
+  localStorage.setItem(STORAGE_KEYS.SERVICES, JSON.stringify(appState.services));
+  localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(appState.categories));
   syncConfigToUsbServer();
 }
 
@@ -397,6 +468,252 @@ function renderSettingsAdvisorList() {
   }
 }
 
+function renderServiceChips() {
+  const container = document.getElementById("service-chips");
+  const query = (document.getElementById("service-search") || {}).value || "";
+  if (!container) return;
+  container.innerHTML = "";
+  appState.services.filter(function (service) {
+    return service.name.toLowerCase().includes(query.trim().toLowerCase());
+  }).forEach(function (service) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "chip service-chip";
+    button.textContent = service.name;
+    button.title = service.category || "service";
+    if (appState.selectedServices.includes(service.name)) button.classList.add("active");
+    button.addEventListener("click", function () {
+      const index = appState.selectedServices.indexOf(service.name);
+      if (index === -1) appState.selectedServices.push(service.name);
+      else appState.selectedServices.splice(index, 1);
+      button.classList.toggle("active", index === -1);
+      updateEmailPreview();
+    });
+    container.appendChild(button);
+  });
+}
+
+function renderTemplatePicker() {
+  const select = document.getElementById("template-select");
+  if (!select) return;
+  const query = (document.getElementById("template-search") || {}).value || "";
+  const previous = select.value;
+  select.innerHTML = "";
+  appState.templates.filter(function (template) {
+    return (template.name + " " + template.category).toLowerCase().includes(query.trim().toLowerCase());
+  }).forEach(function (template) {
+    const option = document.createElement("option");
+    option.value = template.id;
+    option.textContent = template.category ? template.name + " · " + template.category : template.name;
+    select.appendChild(option);
+  });
+  if (appState.templates.some(function (template) { return template.id === previous; })) select.value = previous;
+}
+
+function renderCategoryOptions() {
+  const list = document.getElementById("category-options");
+  if (!list) return;
+  list.innerHTML = "";
+  appState.categories.forEach(function (category) {
+    const option = document.createElement("option");
+    option.value = category;
+    list.appendChild(option);
+  });
+}
+
+function renderSettingsTemplateList() {
+  const list = document.getElementById("settings-template-list");
+  if (!list) return;
+  const query = (document.getElementById("settings-template-search") || {}).value || "";
+  list.innerHTML = "";
+  appState.templates.filter(function (template) {
+    return (template.name + " " + template.category + " " + template.subject).toLowerCase().includes(query.trim().toLowerCase());
+  }).forEach(function (template) {
+    const row = document.createElement("div");
+    row.className = "settings-row";
+    const info = document.createElement("span");
+    info.textContent = template.name + (template.category ? " · " + template.category : "");
+    const actions = document.createElement("div");
+    actions.className = "row-actions";
+    [["fill", function () { fillEmailTemplate(template.id); }], ["edit", function () { openTemplateEditor(template); }], ["delete", function () {
+      if (!window.confirm("Delete template ‘" + template.name + "’?")) return;
+      appState.templates = appState.templates.filter(function (item) { return item.id !== template.id; });
+      if (appState.activeTemplateId === template.id) appState.activeTemplateId = "";
+      saveSettingsToStorage();
+      renderTemplateManagement();
+      updateEmailPreview();
+    }]].forEach(function (action) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "btn btn-secondary btn-small";
+      button.textContent = action[0];
+      button.addEventListener("click", action[1]);
+      actions.appendChild(button);
+    });
+    row.appendChild(info);
+    row.appendChild(actions);
+    list.appendChild(row);
+  });
+}
+
+function renderSettingsServiceList() {
+  const list = document.getElementById("settings-service-list");
+  if (!list) return;
+  const query = (document.getElementById("settings-service-search") || {}).value || "";
+  list.innerHTML = "";
+  appState.services.filter(function (service) {
+    return (service.name + " " + service.category).toLowerCase().includes(query.trim().toLowerCase());
+  }).forEach(function (service) {
+    const row = document.createElement("div");
+    row.className = "settings-row";
+    const info = document.createElement("span");
+    info.textContent = service.name + " · " + (service.category || "uncategorized");
+    const actions = document.createElement("div");
+    actions.className = "row-actions";
+    const edit = document.createElement("button");
+    edit.type = "button";
+    edit.className = "btn btn-secondary btn-small";
+    edit.textContent = "edit";
+    edit.addEventListener("click", function () {
+      const name = window.prompt("Service or problem name", service.name);
+      if (!name || !name.trim()) return;
+      const previousName = service.name;
+      const category = window.prompt("Category", service.category || "Other");
+      service.name = name.trim();
+      appState.selectedServices = appState.selectedServices.map(function (selected) {
+        return selected === previousName ? service.name : selected;
+      });
+      if (category && category.trim()) {
+        service.category = category.trim();
+        if (!appState.categories.includes(service.category)) appState.categories.push(service.category);
+      }
+      saveSettingsToStorage();
+      renderServiceManagement();
+      renderTemplateManagement();
+      updateEmailPreview();
+    });
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "btn btn-danger btn-small";
+    remove.textContent = "delete";
+    remove.addEventListener("click", function () {
+      if (!window.confirm("Delete ‘" + service.name + "’?")) return;
+      appState.services = appState.services.filter(function (item) { return item !== service; });
+      appState.selectedServices = appState.selectedServices.filter(function (name) { return name !== service.name; });
+      saveSettingsToStorage();
+      renderServiceManagement();
+      renderServiceChips();
+      updateEmailPreview();
+    });
+    actions.appendChild(edit);
+    actions.appendChild(remove);
+    row.appendChild(info);
+    row.appendChild(actions);
+    list.appendChild(row);
+  });
+}
+
+function renderSettingsCategoryList() {
+  const list = document.getElementById("settings-category-list");
+  if (!list) return;
+  list.innerHTML = "";
+  appState.categories.forEach(function (category) {
+    const row = document.createElement("div");
+    row.className = "settings-row";
+    const name = document.createElement("span");
+    name.textContent = category;
+    const actions = document.createElement("div");
+    actions.className = "row-actions";
+    const edit = document.createElement("button");
+    edit.type = "button";
+    edit.className = "btn btn-secondary btn-small";
+    edit.textContent = "edit";
+    edit.addEventListener("click", function () {
+      const replacement = window.prompt("Category name", category);
+      if (!replacement || !replacement.trim() || replacement.trim() === category) return;
+      appState.categories = appState.categories.map(function (item) { return item === category ? replacement.trim() : item; });
+      appState.categories = Array.from(new Set(appState.categories));
+      appState.services.forEach(function (service) { if (service.category === category) service.category = replacement.trim(); });
+      appState.templates.forEach(function (template) { if (template.category === category) template.category = replacement.trim(); });
+      saveSettingsToStorage();
+      renderTemplateManagement();
+      renderServiceManagement();
+    });
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "btn btn-danger btn-small";
+    remove.textContent = "delete";
+    remove.addEventListener("click", function () {
+      if (!window.confirm("Delete category ‘" + category + "’? Items in it will become uncategorized.")) return;
+      appState.categories = appState.categories.filter(function (item) { return item !== category; });
+      appState.services.forEach(function (service) { if (service.category === category) service.category = ""; });
+      appState.templates.forEach(function (template) { if (template.category === category) template.category = ""; });
+      saveSettingsToStorage();
+      renderTemplateManagement();
+      renderServiceManagement();
+    });
+    actions.appendChild(edit);
+    actions.appendChild(remove);
+    row.appendChild(name);
+    row.appendChild(actions);
+    list.appendChild(row);
+  });
+}
+
+function renderTemplateManagement() {
+  renderTemplatePicker();
+  renderSettingsTemplateList();
+  renderCategoryOptions();
+  renderSettingsCategoryList();
+}
+
+function renderServiceManagement() {
+  renderServiceChips();
+  renderSettingsServiceList();
+}
+
+function openTemplateEditor(template) {
+  const editor = document.getElementById("template-editor");
+  if (!editor) return;
+  appState.editingTemplateId = template ? template.id : "";
+  document.getElementById("template-name-input").value = template ? template.name : "";
+  document.getElementById("template-category-input").value = template ? (template.category || "") : "";
+  document.getElementById("template-subject-input").value = template ? template.subject : "";
+  document.getElementById("template-body-input").value = template ? template.body : "";
+  editor.classList.remove("hidden");
+  document.getElementById("template-name-input").focus();
+}
+
+function fillEmailTemplate(templateId) {
+  const template = appState.templates.find(function (item) { return item.id === templateId; });
+  const select = document.getElementById("template-select");
+  if (!template) return;
+  if (select) select.value = templateId;
+  appState.activeTemplateId = templateId;
+  appState.previewEdited = false;
+  updateEmailPreview();
+  showToast("filled saved template: " + template.name + ".");
+}
+
+function makeReusableTemplateText(value) {
+  const values = [
+    [document.getElementById("customer-number").value.trim(), "{{customerNumber}}"],
+    [document.getElementById("customer-name").value.trim(), "{{customerName}}"],
+    [document.getElementById("customer-phone").value.trim(), "{{customerPhone}}"],
+    [document.getElementById("customer-vin").value.trim(), "{{vin}}"],
+    [document.getElementById("advisor-name-input").value.trim(), "{{advisorName}}"],
+    [getRequestedServicesText(), "{{serviceDetails}}"],
+    [appState.signature.trim(), "{{signature}}"]
+  ].filter(function (pair) { return pair[0]; }).sort(function (a, b) { return b[0].length - a[0].length; });
+  let reusable = value;
+  values.forEach(function (pair) { reusable = reusable.split(pair[0]).join(pair[1]); });
+  const customerAndNumber = document.getElementById("customer-number").value.trim()
+    ? "{{customerNumber}} {{customerName}}"
+    : "{{customerName}}";
+  reusable = reusable.split("{{customerNumber}} " + "{{customerName}}").join(customerAndNumber);
+  return reusable;
+}
+
 // combine whatever service chips i clicked with my custom notes box
 function getRequestedServicesText() {
   const customNotesInput = document.getElementById("custom-notes");
@@ -510,6 +827,29 @@ function updateEmailPreview() {
   const previewCc = document.getElementById("preview-cc");
   const previewSubject = document.getElementById("preview-subject");
   const previewBody = document.getElementById("preview-body");
+  let previewSubjectValue = subjectLine;
+  let previewBodyValue = bodyLines.join("\n");
+  const activeTemplate = appState.templates.find(function (template) { return template.id === appState.activeTemplateId; });
+  if (activeTemplate && !appState.previewEdited) {
+    const replacements = {
+      customerName: customerName,
+      customerNumber: customerNumber,
+      customerNumberLine: customerNumber ? "Customer #: " + customerNumber : "",
+      customerPhone: phoneNumber,
+      vin: vinValue,
+      advisorName: advisorName,
+      serviceDetails: serviceDetails,
+      customerAndNumber: subjectCustomer,
+      signature: appState.signature.trim()
+    };
+    const fill = function (text) {
+      return text.replace(/{{\s*([a-zA-Z]+)\s*}}/g, function (match, key) {
+        return Object.prototype.hasOwnProperty.call(replacements, key) ? replacements[key] : match;
+      });
+    };
+    previewSubjectValue = fill(activeTemplate.subject);
+    previewBodyValue = fill(activeTemplate.body);
+  }
 
   if (previewTo) {
     previewTo.value = advisorEmail;
@@ -517,11 +857,11 @@ function updateEmailPreview() {
   if (previewCc) {
     previewCc.value = ccEmail;
   }
-  if (previewSubject) {
-    previewSubject.value = subjectLine;
+  if (previewSubject && !appState.previewEdited) {
+    previewSubject.value = previewSubjectValue;
   }
-  if (previewBody) {
-    previewBody.value = bodyLines.join("\n");
+  if (previewBody && !appState.previewEdited) {
+    previewBody.value = previewBodyValue;
   }
 }
 
@@ -1613,6 +1953,8 @@ function initializeDashboardEvents() {
   renderSettingsAdvisorList();
   renderCcPills();
   renderSettingsCcList();
+  renderTemplateManagement();
+  renderServiceManagement();
 
   const sigInput = document.getElementById("signature-input");
   if (sigInput) {
@@ -1628,6 +1970,8 @@ function initializeDashboardEvents() {
       }
       modeButtons[i].classList.add("active");
       appState.mode = modeButtons[i].getAttribute("data-mode");
+      appState.activeTemplateId = "";
+      appState.previewEdited = false;
 
       const notesLabel = document.getElementById("custom-notes-label");
       if (notesLabel) {
@@ -1643,22 +1987,87 @@ function initializeDashboardEvents() {
     });
   }
 
-  // clicking on bmw service chips
-  const serviceButtons = document.querySelectorAll(".service-chip");
-  for (let i = 0; i < serviceButtons.length; i++) {
-    serviceButtons[i].addEventListener("click", function () {
-      const serviceName = serviceButtons[i].getAttribute("data-service");
-      const existingIndex = appState.selectedServices.indexOf(serviceName);
-      if (existingIndex === -1) {
-        appState.selectedServices.push(serviceName);
-        serviceButtons[i].classList.add("active");
-      } else {
-        appState.selectedServices.splice(existingIndex, 1);
-        serviceButtons[i].classList.remove("active");
-      }
-      updateEmailPreview();
+  const serviceSearch = document.getElementById("service-search");
+  if (serviceSearch) serviceSearch.addEventListener("input", renderServiceChips);
+
+  const templateSearch = document.getElementById("template-search");
+  if (templateSearch) templateSearch.addEventListener("input", renderTemplatePicker);
+  const fillTemplateBtn = document.getElementById("fill-template-btn");
+  if (fillTemplateBtn) fillTemplateBtn.addEventListener("click", function () {
+    fillEmailTemplate(document.getElementById("template-select").value);
+  });
+  const saveTemplateBtn = document.getElementById("save-template-btn");
+  if (saveTemplateBtn) saveTemplateBtn.addEventListener("click", function () {
+    openTemplateEditor({
+      name: "",
+      category: "",
+      subject: makeReusableTemplateText(document.getElementById("preview-subject").value),
+      body: makeReusableTemplateText(document.getElementById("preview-body").value)
     });
-  }
+    appState.editingTemplateId = "";
+  });
+  const newTemplateBtn = document.getElementById("new-template-btn");
+  if (newTemplateBtn) newTemplateBtn.addEventListener("click", function () {
+    openTemplateEditor({ name: "", category: "", subject: "", body: "" });
+    appState.editingTemplateId = "";
+  });
+  const templateListSearch = document.getElementById("settings-template-search");
+  if (templateListSearch) templateListSearch.addEventListener("input", renderSettingsTemplateList);
+  const serviceListSearch = document.getElementById("settings-service-search");
+  if (serviceListSearch) serviceListSearch.addEventListener("input", renderSettingsServiceList);
+  const saveTemplateEditorBtn = document.getElementById("save-template-editor-btn");
+  if (saveTemplateEditorBtn) saveTemplateEditorBtn.addEventListener("click", function () {
+    const name = document.getElementById("template-name-input").value.trim();
+    if (!name) { showToast("enter a template name."); return; }
+    const category = document.getElementById("template-category-input").value.trim();
+    if (category && !appState.categories.some(function (item) { return item.toLowerCase() === category.toLowerCase(); })) appState.categories.push(category);
+    const template = {
+      id: appState.editingTemplateId || ("template-" + Date.now()),
+      name: name,
+      category: category,
+      subject: document.getElementById("template-subject-input").value,
+      body: document.getElementById("template-body-input").value
+    };
+    const existing = appState.templates.findIndex(function (item) { return item.id === template.id; });
+    if (existing === -1) appState.templates.push(template);
+    else appState.templates[existing] = template;
+    saveSettingsToStorage();
+    document.getElementById("template-editor").classList.add("hidden");
+    renderTemplateManagement();
+    renderTemplatePicker();
+    showToast("saved template: " + name + ".");
+  });
+  const cancelTemplateEditorBtn = document.getElementById("cancel-template-editor-btn");
+  if (cancelTemplateEditorBtn) cancelTemplateEditorBtn.addEventListener("click", function () {
+    document.getElementById("template-editor").classList.add("hidden");
+  });
+  const addServiceBtn = document.getElementById("add-service-btn");
+  if (addServiceBtn) addServiceBtn.addEventListener("click", function () {
+    const nameInput = document.getElementById("new-service-name");
+    const categoryInput = document.getElementById("new-service-category");
+    const name = nameInput.value.trim();
+    if (!name) { showToast("enter a service or problem."); return; }
+    const category = categoryInput.value.trim() || "Other";
+    if (!appState.categories.includes(category)) appState.categories.push(category);
+    appState.services.push({ name: name, category: category });
+    nameInput.value = "";
+    categoryInput.value = "";
+    saveSettingsToStorage();
+    renderServiceManagement();
+    renderTemplateManagement();
+    showToast("added service or problem: " + name + ".");
+  });
+  const addCategoryBtn = document.getElementById("add-category-btn");
+  if (addCategoryBtn) addCategoryBtn.addEventListener("click", function () {
+    const input = document.getElementById("new-category-name");
+    const category = input.value.trim();
+    if (!category) { showToast("enter a category name."); return; }
+    if (!appState.categories.some(function (item) { return item.toLowerCase() === category.toLowerCase(); })) appState.categories.push(category);
+    input.value = "";
+    saveSettingsToStorage();
+    renderTemplateManagement();
+    showToast("added category: " + category + ".");
+  });
 
   // update the email preview whenever i type in any text box
   const liveFieldIds = [
@@ -1676,6 +2085,7 @@ function initializeDashboardEvents() {
     const inputEl = document.getElementById(liveFieldIds[i]);
     if (inputEl) {
       inputEl.addEventListener("input", function () {
+        appState.previewEdited = false;
         if (liveFieldIds[i] === "customer-vin") {
           const last7 = extractLast7Vin(inputEl.value);
           const helper = document.getElementById("vin-helper-text");
@@ -1687,6 +2097,7 @@ function initializeDashboardEvents() {
             }
           }
         }
+
         if (liveFieldIds[i] === "cc-email-input") {
           renderCcPills();
         }
@@ -1694,6 +2105,11 @@ function initializeDashboardEvents() {
       });
     }
   }
+
+  ["preview-subject", "preview-body"].forEach(function (id) {
+    const input = document.getElementById(id);
+    if (input) input.addEventListener("input", function () { appState.previewEdited = true; });
+  });
 
   // auto-split variable-length customer # when pasted or typed onto the customer name box
   const customerNameInput = document.getElementById("customer-name");
