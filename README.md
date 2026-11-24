@@ -5,10 +5,10 @@ i built this tool to speed up my daily workflow at the bmw, mini & rolls-royce s
 ## screenshots
 
 ### service desk dashboard
-![Service Desk Dashboard](docs/images/dashboard-view.png)
+![Service Desk Dashboard with sample customer information](docs/images/dashboard-updated.jpg)
 
-### advisors, cc & portable usb sync
-![Advisors & USB Settings](docs/images/settings-view.png)
+### templates, services & settings
+![Email templates, service quick picks, and categories](docs/images/settings-updated.jpg)
 
 ## how it works
 
