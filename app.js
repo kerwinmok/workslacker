@@ -171,6 +171,7 @@ const appState = {
   activeTemplateId: "",
   previewEdited: false,
   editingTemplateId: "",
+  closeModalAfterTemplateSave: false,
   signature: DEFAULT_SIGNATURE,
   screenshotDataUrl: "",
   screenshotBlob: null
@@ -566,6 +567,21 @@ function getTemplatesForMode(mode) {
   });
 }
 
+// return the active template for the current mode
+function getActiveTemplate() {
+  const modeTemplates = getTemplatesForMode(appState.mode);
+  if (modeTemplates.length === 0) return null;
+  return modeTemplates.find(function (t) { return t.id === appState.activeTemplateId; }) || modeTemplates[0];
+}
+
+// keep the save button label matched to whichever template is currently selected
+function updateSaveTemplateButtonLabel() {
+  const btn = document.getElementById("save-template-btn");
+  if (!btn) return;
+  const active = getActiveTemplate();
+  btn.textContent = active ? ('save changes to "' + active.name + '"') : "save current email as template";
+}
+
 function setActiveModeUi(mode) {
   appState.mode = mode;
   const modeButtons = document.querySelectorAll(".mode-btn");
@@ -607,6 +623,7 @@ function renderTemplateVariationPills() {
     });
     container.appendChild(button);
   });
+  updateSaveTemplateButtonLabel();
 }
 
 function renderCategoryOptions() {
@@ -776,12 +793,17 @@ function renderServiceManagement() {
   renderSettingsServiceList();
 }
 
-function openTemplateEditor(template) {
+function openTemplateEditor(template, options) {
   const modal = document.getElementById("settings-modal");
   if (modal) modal.classList.remove("hidden");
   const editor = document.getElementById("template-editor");
   if (!editor) return;
+  appState.closeModalAfterTemplateSave = Boolean(options && options.closeModalOnSave);
   appState.editingTemplateId = template ? (template.id || "") : "";
+  const saveAsNewBtn = document.getElementById("save-as-new-template-btn");
+  if (saveAsNewBtn) {
+    saveAsNewBtn.classList.toggle("hidden", appState.editingTemplateId === "");
+  }
   document.getElementById("template-name-input").value = template ? (template.name || "") : "";
   const modeSelect = document.getElementById("template-mode-input");
   if (modeSelect) {
@@ -808,23 +830,85 @@ function selectEmailTemplate(templateId) {
   showToast("selected template: " + template.name + ".");
 }
 
-function makeReusableTemplateText(value) {
+function escapeRegExp(text) {
+  return String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// swap live call details back into placeholders so advisor and problem never get hardcoded
+function makeReusableTemplateText(value, isSubject) {
+  const custNumEl = document.getElementById("customer-number");
+  const custNameEl = document.getElementById("customer-name");
+  const custPhoneEl = document.getElementById("customer-phone");
+  const custVinEl = document.getElementById("customer-vin");
+  const advisorEl = document.getElementById("advisor-name-input");
+
+  const custNum = custNumEl ? custNumEl.value.trim() : "";
+  const custName = custNameEl ? custNameEl.value.trim() : "";
+  const custPhone = custPhoneEl ? custPhoneEl.value.trim() : "";
+  const rawVin = custVinEl ? custVinEl.value.trim() : "";
+  const upperVin = rawVin.toUpperCase();
+  const advisorName = advisorEl ? advisorEl.value.trim() : "";
+  const serviceText = getRequestedServicesText();
+  const sigText = appState.signature ? appState.signature.trim() : "";
+
   const values = [
-    [document.getElementById("customer-number").value.trim(), "{{customerNumber}}"],
-    [document.getElementById("customer-name").value.trim(), "{{customerName}}"],
-    [document.getElementById("customer-phone").value.trim(), "{{customerPhone}}"],
-    [document.getElementById("customer-vin").value.trim(), "{{vin}}"],
-    [document.getElementById("advisor-name-input").value.trim(), "{{advisorName}}"],
-    [getRequestedServicesText(), "{{serviceDetails}}"],
-    [appState.signature.trim(), "{{signature}}"]
-  ].filter(function (pair) { return pair[0]; }).sort(function (a, b) { return b[0].length - a[0].length; });
-  let reusable = value;
-  values.forEach(function (pair) { reusable = reusable.split(pair[0]).join(pair[1]); });
-  reusable = reusable.replace(/^Customer #:\s*\{\{customerNumber\}\}$/m, "{{customerNumberLine}}");
-  const customerAndNumber = document.getElementById("customer-number").value.trim()
-    ? "{{customerNumber}} {{customerName}}"
-    : "{{customerName}}";
-  reusable = reusable.split("{{customerNumber}} " + "{{customerName}}").join(customerAndNumber);
+    [custNum, "{{customerNumber}}"],
+    [custName, "{{customerName}}"],
+    [custPhone, "{{customerPhone}}"],
+    [rawVin, "{{vin}}"],
+    [upperVin, "{{vin}}"],
+    [serviceText, "{{serviceDetails}}"],
+    [sigText, "{{signature}}"],
+    ["[Customer Name]", "{{customerName}}"],
+    ["[Phone Number]", "{{customerPhone}}"],
+    ["[VIN]", "{{vin}}"],
+    ["[Service Advisor]", "{{advisorName}}"],
+    ["[problem / requested service]", "{{serviceDetails}}"],
+    ["[details / inquiry]", "{{serviceDetails}}"]
+  ];
+
+  // avoid corrupting normal words when an advisor name is very short
+  if (advisorName.length > 3) {
+    values.push([advisorName, "{{advisorName}}"]);
+  }
+
+  let reusable = String(value || "");
+  values
+    .filter(function (pair) { return pair[0]; })
+    .sort(function (a, b) { return b[0].length - a[0].length; })
+    .forEach(function (pair) {
+      reusable = reusable.split(pair[0]).join(pair[1]);
+    });
+
+  if (advisorName && advisorName.length <= 3) {
+    const shortAdvisorRegex = new RegExp("(^|[^A-Za-z0-9_])" + escapeRegExp(advisorName) + "(?=$|[^A-Za-z0-9_])", "g");
+    reusable = reusable.replace(shortAdvisorRegex, "$1{{advisorName}}");
+  }
+
+  if (isSubject) {
+    reusable = reusable.split("{{customerNumber}} {{customerName}}").join("{{customerAndNumber}}");
+    reusable = reusable.split("{{customerName}}").join("{{customerAndNumber}}");
+    return reusable;
+  }
+
+  // normalize labeled customer/vin/problem lines so edited preview text stays dynamic
+  reusable = reusable
+    .replace(/^([ \t]*Customer\s+Name:[ \t]*).+$/m, "$1{{customerName}}")
+    .replace(/^([ \t]*Customer\s*#:[ \t]*).+$/m, "{{customerNumberLine}}")
+    .replace(/^([ \t]*Phone\s+Number:[ \t]*).+$/m, "$1{{customerPhone}}")
+    .replace(/^([ \t]*VIN:[ \t]*).+$/m, "$1{{vin}}")
+    .replace(/^([ \t]*Problem\s*\/\s*Service:[ \t]*).+$/m, "$1{{serviceDetails}}");
+
+  // keep customerNumberLine under Customer Name if the active email didn't have a customer # yet
+  if (reusable.indexOf("{{customerNumberLine}}") === -1 && /^([ \t]*Customer\s+Name:[ \t]*\{\{customerName\}\})$/m.test(reusable)) {
+    reusable = reusable.replace(/^([ \t]*Customer\s+Name:[ \t]*\{\{customerName\}\})$/m, "$1\n{{customerNumberLine}}");
+  }
+
+  const active = getActiveTemplate();
+  if (reusable.indexOf("{{signature}}") === -1 && active && active.body && active.body.indexOf("{{signature}}") !== -1) {
+    reusable = reusable.trimEnd() + "\n\n{{signature}}";
+  }
+
   return reusable;
 }
 
@@ -2111,13 +2195,14 @@ function initializeDashboardEvents() {
 
   const saveTemplateBtn = document.getElementById("save-template-btn");
   if (saveTemplateBtn) saveTemplateBtn.addEventListener("click", function () {
+    const active = getActiveTemplate();
     openTemplateEditor({
-      id: "",
-      mode: appState.mode,
-      name: "",
-      subject: makeReusableTemplateText(document.getElementById("preview-subject").value),
-      body: makeReusableTemplateText(document.getElementById("preview-body").value)
-    });
+      id: active ? active.id : "",
+      mode: active ? inferTemplateMode(active) : appState.mode,
+      name: active ? active.name : "",
+      subject: makeReusableTemplateText(document.getElementById("preview-subject").value, true),
+      body: makeReusableTemplateText(document.getElementById("preview-body").value, false)
+    }, { closeModalOnSave: true });
   });
   const newTemplateBtn = document.getElementById("new-template-btn");
   if (newTemplateBtn) newTemplateBtn.addEventListener("click", function () {
@@ -2127,20 +2212,23 @@ function initializeDashboardEvents() {
   if (templateListSearch) templateListSearch.addEventListener("input", renderSettingsTemplateList);
   const serviceListSearch = document.getElementById("settings-service-search");
   if (serviceListSearch) serviceListSearch.addEventListener("input", renderSettingsServiceList);
-  const saveTemplateEditorBtn = document.getElementById("save-template-editor-btn");
-  if (saveTemplateEditorBtn) saveTemplateEditorBtn.addEventListener("click", function () {
+
+  function persistTemplateFromEditor(forceNew) {
     const name = document.getElementById("template-name-input").value.trim();
     if (!name) { showToast("enter a template name."); return; }
     const modeSelect = document.getElementById("template-mode-input");
     const mode = modeSelect ? modeSelect.value : (appState.mode || "quote");
+    const useExistingId = !forceNew && appState.editingTemplateId;
     const template = {
-      id: appState.editingTemplateId || ("template-" + Date.now()),
+      id: useExistingId ? appState.editingTemplateId : ("template-" + Date.now()),
       mode: mode,
       name: name,
       subject: document.getElementById("template-subject-input").value,
       body: document.getElementById("template-body-input").value
     };
-    const existing = appState.templates.findIndex(function (item) { return item.id === template.id; });
+    const existing = useExistingId
+      ? appState.templates.findIndex(function (item) { return item.id === template.id; })
+      : -1;
     if (existing === -1) appState.templates.push(template);
     else appState.templates[existing] = template;
     setActiveModeUi(mode);
@@ -2148,13 +2236,32 @@ function initializeDashboardEvents() {
     appState.previewEdited = false;
     saveSettingsToStorage();
     document.getElementById("template-editor").classList.add("hidden");
+    if (appState.closeModalAfterTemplateSave) {
+      const settingsModalEl = document.getElementById("settings-modal");
+      if (settingsModalEl) settingsModalEl.classList.add("hidden");
+      appState.closeModalAfterTemplateSave = false;
+    }
     renderTemplateManagement();
     updateEmailPreview();
     showToast("saved template: " + name + ".");
+  }
+
+  const saveTemplateEditorBtn = document.getElementById("save-template-editor-btn");
+  if (saveTemplateEditorBtn) saveTemplateEditorBtn.addEventListener("click", function () {
+    persistTemplateFromEditor(false);
+  });
+  const saveAsNewTemplateBtn = document.getElementById("save-as-new-template-btn");
+  if (saveAsNewTemplateBtn) saveAsNewTemplateBtn.addEventListener("click", function () {
+    persistTemplateFromEditor(true);
   });
   const cancelTemplateEditorBtn = document.getElementById("cancel-template-editor-btn");
   if (cancelTemplateEditorBtn) cancelTemplateEditorBtn.addEventListener("click", function () {
     document.getElementById("template-editor").classList.add("hidden");
+    if (appState.closeModalAfterTemplateSave) {
+      const settingsModalEl = document.getElementById("settings-modal");
+      if (settingsModalEl) settingsModalEl.classList.add("hidden");
+      appState.closeModalAfterTemplateSave = false;
+    }
   });
   const addServiceBtn = document.getElementById("add-service-btn");
   if (addServiceBtn) addServiceBtn.addEventListener("click", function () {

@@ -27,7 +27,7 @@
         advisors &amp; templates
       </button>
       <button id="reset-form-btn" class="btn btn-danger" type="button" title="shortcut: alt + r">
-        new call (alt+r)
+        reset
       </button>
     </div>
   </header>
@@ -192,7 +192,7 @@
         </div>
 
         <div class="dispatch-buttons">
-          <button type="button" id="save-template-btn" class="btn btn-secondary">save current email as template</button>
+          <button type="button" id="save-template-btn" class="btn btn-secondary">save template</button>
           <div class="dispatch-row-secondary">
             <button type="button" id="copy-plain-body-btn" class="btn btn-primary btn-large">
               copy email body
@@ -244,7 +244,7 @@
             <div class="field-group"><label for="template-subject-input">subject</label><input type="text" id="template-subject-input" /></div>
             <div class="field-group"><label for="template-body-input">email body</label><textarea id="template-body-input" rows="10"></textarea></div>
             <small class="helper-text">placeholders: {{customerName}}, {{customerNumber}}, {{customerNumberLine}}, {{customerPhone}}, {{vin}}, {{advisorName}}, {{serviceDetails}}, {{customerAndNumber}}, {{signature}}</small>
-            <div class="template-editor-actions"><button type="button" id="save-template-editor-btn" class="btn btn-primary">save template</button><button type="button" id="cancel-template-editor-btn" class="btn btn-secondary">cancel</button></div>
+            <div class="template-editor-actions"><button type="button" id="save-template-editor-btn" class="btn btn-primary">save template</button><button type="button" id="save-as-new-template-btn" class="btn btn-secondary hidden">save as new</button><button type="button" id="cancel-template-editor-btn" class="btn btn-secondary">cancel</button></div>
           </div>
         </section>
 
