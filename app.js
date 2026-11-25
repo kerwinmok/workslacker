@@ -51,11 +51,105 @@ const DEFAULT_SERVICES = [
 const DEFAULT_CATEGORIES = ["Price Quote", "Oil Change", "Status Update", "Callback", "Maintenance", "Brakes", "Tires", "Diagnostics", "Electrical", "Customer Concern", "Other"];
 
 const DEFAULT_TEMPLATES = [
-  { id: "price-quote", name: "Price Quote", category: "Price Quote", subject: "PRICE QUOTE: {{customerAndNumber}}", body: "Hello {{advisorName}},\n\nCould you please provide a price quote for the request below?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nProblem / Service: {{serviceDetails}}\n\n{{signature}}" },
-  { id: "oil-change", name: "Oil Change", category: "Oil Change", subject: "OIL SERVICE: {{customerAndNumber}}", body: "Hello {{advisorName}},\n\nCould you please provide a price quote for an oil service?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nProblem / Service: {{serviceDetails}}\n\n{{signature}}" },
-  { id: "status-update", name: "Status Update", category: "Status Update", subject: "STATUS UPDATE: {{customerAndNumber}}", body: "Hello {{advisorName}},\n\nCould you please provide a status update for the customer below?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nProblem / Service: {{serviceDetails}}\n\n{{signature}}" },
-  { id: "callback", name: "Callback", category: "Callback", subject: "CALLBACK: {{customerAndNumber}}", body: "Hello {{advisorName}},\n\nCould you please give the customer below a call back?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nProblem / Service: {{serviceDetails}}\n\n{{signature}}" }
+  {
+    id: "quote-standard",
+    mode: "quote",
+    name: "Standard Quote",
+    subject: "PRICE QUOTE: {{customerAndNumber}}",
+    body: "Hello {{advisorName}},\n\nCould you please provide a price quote for the request below?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nProblem / Service: {{serviceDetails}}\n\n{{signature}}"
+  },
+  {
+    id: "quote-maintenance",
+    mode: "quote",
+    name: "Oil / Maintenance",
+    subject: "PRICE QUOTE: {{customerAndNumber}}",
+    body: "Hello {{advisorName}},\n\nCould you please provide a price quote and availability for the maintenance service below?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nProblem / Service: {{serviceDetails}}\n\n{{signature}}"
+  },
+  {
+    id: "quote-brakes-tires",
+    mode: "quote",
+    name: "Brakes / Tires",
+    subject: "PRICE QUOTE: {{customerAndNumber}}",
+    body: "Hello {{advisorName}},\n\nCould you please provide a parts and labor quote for the brake/tire request below?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nProblem / Service: {{serviceDetails}}\n\n{{signature}}"
+  },
+  {
+    id: "status-general",
+    mode: "status",
+    name: "General Status",
+    subject: "STATUS UPDATE: {{customerAndNumber}}",
+    body: "Hello {{advisorName}},\n\nCould you please provide a status update for the customer below?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nProblem / Service: {{serviceDetails}}\n\n{{signature}}"
+  },
+  {
+    id: "status-ready",
+    mode: "status",
+    name: "Ready for Pickup?",
+    subject: "STATUS UPDATE: {{customerAndNumber}}",
+    body: "Hello {{advisorName}},\n\nThe customer below called to check if their vehicle is ready for pickup. Could you please provide an update?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nProblem / Service: {{serviceDetails}}\n\n{{signature}}"
+  },
+  {
+    id: "status-eta",
+    mode: "status",
+    name: "Parts / Repair ETA",
+    subject: "STATUS UPDATE: {{customerAndNumber}}",
+    body: "Hello {{advisorName}},\n\nThe customer below is asking for an updated ETA on parts/repairs. Could you please advise?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nProblem / Service: {{serviceDetails}}\n\n{{signature}}"
+  },
+  {
+    id: "callback-standard",
+    mode: "callback",
+    name: "Standard Callback",
+    subject: "CALLBACK: {{customerAndNumber}}",
+    body: "Hello {{advisorName}},\n\nCould you please give the customer below a call back?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nProblem / Service: {{serviceDetails}}\n\n{{signature}}"
+  },
+  {
+    id: "callback-urgent",
+    mode: "callback",
+    name: "Urgent Callback",
+    subject: "CALLBACK: {{customerAndNumber}}",
+    body: "Hello {{advisorName}},\n\nThe customer below requested a callback as soon as possible regarding the issue below.\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nProblem / Service: {{serviceDetails}}\n\n{{signature}}"
+  },
+  {
+    id: "callback-booking",
+    mode: "callback",
+    name: "Follow-Up / Booking",
+    subject: "CALLBACK: {{customerAndNumber}}",
+    body: "Hello {{advisorName}},\n\nCould you please call the customer below back to follow up or schedule their appointment?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nProblem / Service: {{serviceDetails}}\n\n{{signature}}"
+  }
 ];
+
+function inferTemplateMode(template) {
+  if (!template) return "quote";
+  const rawMode = String(template.mode || "").toLowerCase();
+  if (rawMode === "quote" || rawMode === "status" || rawMode === "callback") {
+    return rawMode;
+  }
+  const hint = (String(template.category || "") + " " + String(template.name || "") + " " + String(template.id || "")).toLowerCase();
+  if (hint.indexOf("status") !== -1) return "status";
+  if (hint.indexOf("callback") !== -1 || hint.indexOf("call back") !== -1) return "callback";
+  return "quote";
+}
+
+function formatModeLabel(mode) {
+  if (mode === "status") return "Status Update";
+  if (mode === "callback") return "Callback";
+  return "Price Quote";
+}
+
+function isLegacyBundledTemplates(list) {
+  if (!Array.isArray(list) || list.length !== 4) return false;
+  const legacyIds = ["price-quote", "oil-change", "status-update", "callback"];
+  for (let i = 0; i < list.length; i++) {
+    if (!list[i] || legacyIds.indexOf(list[i].id) === -1) return false;
+  }
+  return true;
+}
+
+function normalizeLoadedTemplates(list) {
+  return list.filter(function (item) {
+    return item && typeof item.id === "string" && typeof item.name === "string" && typeof item.subject === "string" && typeof item.body === "string";
+  }).map(function (item) {
+    return Object.assign({}, item, { mode: inferTemplateMode(item) });
+  });
+}
 
 // shared vin prefixes (bmw, mini, and rolls-royce) and text parsing regexes
 const KNOWN_VIN_PREFIXES = ["WBA", "WBS", "WBY", "WBW", "WBX", "WMW", "WMZ", "5UX", "5YM", "5UM", "3MW", "3MF", "4US", "SCA", "SBA", "SCB", "SLA"];
@@ -126,10 +220,11 @@ function applyConfigObject(cfg) {
     });
   }
   if (Array.isArray(cfg.categories)) appState.categories = cfg.categories.filter(function (item) { return typeof item === "string"; });
-  if (Array.isArray(cfg.templates)) {
-    appState.templates = cfg.templates.filter(function (item) {
-      return item && typeof item.id === "string" && typeof item.name === "string" && typeof item.subject === "string" && typeof item.body === "string";
-    });
+  if (Array.isArray(cfg.templates) && cfg.templates.length > 0) {
+    const normalized = normalizeLoadedTemplates(cfg.templates);
+    if (normalized.length > 0 && !isLegacyBundledTemplates(normalized)) {
+      appState.templates = normalized;
+    }
   }
   return true;
 }
@@ -191,11 +286,16 @@ function loadSavedSettings() {
     try {
       const value = JSON.parse(raw);
       if (Array.isArray(value)) {
-        appState[keyPair[1]] = keyPair[1] === "services"
-          ? value.filter(function (item) { return item && typeof item.name === "string" && typeof item.category === "string"; })
-          : keyPair[1] === "templates"
-            ? value.filter(function (item) { return item && typeof item.id === "string" && typeof item.name === "string" && typeof item.subject === "string" && typeof item.body === "string"; })
-            : value.filter(function (item) { return typeof item === "string"; });
+        if (keyPair[1] === "services") {
+          appState.services = value.filter(function (item) { return item && typeof item.name === "string" && typeof item.category === "string"; });
+        } else if (keyPair[1] === "templates") {
+          const normalized = normalizeLoadedTemplates(value);
+          if (normalized.length > 0 && !isLegacyBundledTemplates(normalized)) {
+            appState.templates = normalized;
+          }
+        } else {
+          appState.categories = value.filter(function (item) { return typeof item === "string"; });
+        }
       }
     } catch (err) {
       // keep the bundled defaults
@@ -203,7 +303,7 @@ function loadSavedSettings() {
   });
 }
 
-// select an advisor by index and populate the to fields
+// select an advisor by index and populate the advisor name field
 function selectAdvisorByIndex(idx) {
   if (idx < 0 || idx >= appState.advisors.length) {
     return;
@@ -211,15 +311,72 @@ function selectAdvisorByIndex(idx) {
   const advisor = appState.advisors[idx];
   appState.selectedAdvisorIndex = idx;
   const nameInput = document.getElementById("advisor-name-input");
-  const emailInput = document.getElementById("advisor-email-input");
   if (nameInput) {
     nameInput.value = advisor.name;
   }
-  if (emailInput) {
-    emailInput.value = advisor.email;
-  }
   renderAdvisorPills();
   updateEmailPreview();
+}
+
+// add a new advisor (or select it if already present) and persist to storage/usb
+function addOrSelectAdvisorByName(rawName) {
+  const trimmed = String(rawName || "").trim();
+  if (trimmed === "") {
+    showToast("enter advisor name.");
+    return false;
+  }
+
+  const existingIdx = appState.advisors.findIndex(function (item) {
+    return item && item.name && item.name.toLowerCase() === trimmed.toLowerCase();
+  });
+  if (existingIdx !== -1) {
+    selectAdvisorByIndex(existingIdx);
+    showToast("selected advisor " + appState.advisors[existingIdx].name + ".");
+    return true;
+  }
+
+  appState.advisors.push({ name: trimmed, email: "" });
+  appState.selectedAdvisorIndex = appState.advisors.length - 1;
+  const nameInput = document.getElementById("advisor-name-input");
+  if (nameInput) {
+    nameInput.value = trimmed;
+  }
+  saveSettingsToStorage();
+  renderAdvisorPills();
+  renderSettingsAdvisorList();
+  updateEmailPreview();
+  showToast("added advisor " + trimmed + ".");
+  return true;
+}
+
+// remove an advisor by index, update selection, and persist to storage/usb
+function removeAdvisorAtIndex(idx) {
+  if (idx < 0 || idx >= appState.advisors.length) {
+    return;
+  }
+  const removed = appState.advisors.splice(idx, 1)[0];
+  if (appState.selectedAdvisorIndex === idx) {
+    if (appState.advisors.length > 0) {
+      appState.selectedAdvisorIndex = Math.min(idx, appState.advisors.length - 1);
+      const nameInput = document.getElementById("advisor-name-input");
+      if (nameInput) {
+        nameInput.value = appState.advisors[appState.selectedAdvisorIndex].name;
+      }
+    } else {
+      appState.selectedAdvisorIndex = -1;
+      const nameInput = document.getElementById("advisor-name-input");
+      if (nameInput) {
+        nameInput.value = "";
+      }
+    }
+  } else if (appState.selectedAdvisorIndex > idx) {
+    appState.selectedAdvisorIndex = appState.selectedAdvisorIndex - 1;
+  }
+  saveSettingsToStorage();
+  renderAdvisorPills();
+  renderSettingsAdvisorList();
+  updateEmailPreview();
+  showToast("removed advisor " + (removed ? removed.name : "") + ".");
 }
 
 // pull the latest advisors.json from my local usb server so changes carry across pcs
@@ -255,10 +412,10 @@ async function syncConfigFromUsbServer() {
         renderAdvisorPills();
       }
       renderSettingsAdvisorList();
-      renderCcPills();
-      renderSettingsCcList();
+      renderTemplateManagement();
+      renderServiceManagement();
       updateEmailPreview();
-      setUsbSyncStatus("connected — advisors and cc presets auto-save to advisors.json.");
+      setUsbSyncStatus("connected — advisors and templates auto-save to advisors.json.");
     }
   } catch (err) {
     setUsbSyncStatus("could not reach local server — using browser storage.");
@@ -306,7 +463,7 @@ function showToast(messageText) {
   toastEl.textContent = messageText;
 }
 
-// build the advisor buttons so i can click one instead of typing their email
+// build the advisor pills with quick select and inline remove
 function renderAdvisorPills() {
   const container = document.getElementById("advisor-pills");
   if (!container) {
@@ -316,118 +473,34 @@ function renderAdvisorPills() {
 
   for (let i = 0; i < appState.advisors.length; i++) {
     const advisor = appState.advisors[i];
-    const pill = document.createElement("button");
-    pill.type = "button";
-    pill.className = "chip";
+    const pill = document.createElement("div");
+    pill.className = "chip advisor-chip";
     if (i === appState.selectedAdvisorIndex) {
       pill.classList.add("active");
     }
-    pill.textContent = advisor.name;
 
-    pill.addEventListener("click", function () {
+    const nameBtn = document.createElement("button");
+    nameBtn.type = "button";
+    nameBtn.className = "chip-name-btn";
+    nameBtn.textContent = advisor.name;
+    nameBtn.addEventListener("click", function () {
       selectAdvisorByIndex(i);
     });
 
-    container.appendChild(pill);
-  }
-}
-
-// split a comma or semicolon list of emails into a clean deduplicated array
-function parseEmailList(rawValue) {
-  if (!rawValue || rawValue.trim() === "") {
-    return [];
-  }
-  const parts = rawValue.split(/[,;]+/);
-  const cleaned = [];
-  for (let i = 0; i < parts.length; i++) {
-    const email = parts[i].trim();
-    if (email !== "" && cleaned.indexOf(email) === -1) {
-      cleaned.push(email);
-    }
-  }
-  return cleaned;
-}
-
-// build quick cc buttons so i can click to add/remove cc recipients
-function renderCcPills() {
-  const container = document.getElementById("cc-pills");
-  if (!container) {
-    return;
-  }
-  container.innerHTML = "";
-
-  const ccInput = document.getElementById("cc-email-input");
-  let currentEmails = [];
-  if (ccInput) {
-    currentEmails = parseEmailList(ccInput.value);
-  }
-  appState.selectedCcEmails = currentEmails;
-
-  for (let i = 0; i < appState.ccContacts.length; i++) {
-    const contact = appState.ccContacts[i];
-    const pill = document.createElement("button");
-    pill.type = "button";
-    pill.className = "chip";
-    if (currentEmails.indexOf(contact.email) !== -1) {
-      pill.classList.add("active");
-    }
-    pill.textContent = contact.name;
-
-    pill.addEventListener("click", function () {
-      const box = document.getElementById("cc-email-input");
-      let list = [];
-      if (box) {
-        list = parseEmailList(box.value);
-      }
-      const idx = list.indexOf(contact.email);
-      if (idx === -1) {
-        list.push(contact.email);
-      } else {
-        list.splice(idx, 1);
-      }
-      if (box) {
-        box.value = list.join(", ");
-      }
-      appState.selectedCcEmails = list;
-      renderCcPills();
-      updateEmailPreview();
-    });
-
-    container.appendChild(pill);
-  }
-}
-
-// show my saved cc contacts inside settings so i can add or delete them
-function renderSettingsCcList() {
-  const listEl = document.getElementById("settings-cc-list");
-  if (!listEl) {
-    return;
-  }
-  listEl.innerHTML = "";
-
-  for (let i = 0; i < appState.ccContacts.length; i++) {
-    const contact = appState.ccContacts[i];
-    const row = document.createElement("div");
-    row.className = "advisor-row-item";
-
-    const infoSpan = document.createElement("span");
-    infoSpan.textContent = contact.name + " (" + contact.email + ")";
-
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
-    removeBtn.className = "btn btn-danger";
-    removeBtn.textContent = "remove";
-    removeBtn.addEventListener("click", function () {
-      appState.ccContacts.splice(i, 1);
-      saveSettingsToStorage();
-      renderCcPills();
-      renderSettingsCcList();
-      updateEmailPreview();
+    removeBtn.className = "chip-remove-btn";
+    removeBtn.textContent = "\u00d7";
+    removeBtn.title = "remove " + advisor.name;
+    removeBtn.setAttribute("aria-label", "remove " + advisor.name);
+    removeBtn.addEventListener("click", function (event) {
+      event.stopPropagation();
+      removeAdvisorAtIndex(i);
     });
 
-    row.appendChild(infoSpan);
-    row.appendChild(removeBtn);
-    listEl.appendChild(row);
+    pill.appendChild(nameBtn);
+    pill.appendChild(removeBtn);
+    container.appendChild(pill);
   }
 }
 
@@ -445,21 +518,14 @@ function renderSettingsAdvisorList() {
     row.className = "advisor-row-item";
 
     const infoSpan = document.createElement("span");
-    infoSpan.textContent = advisor.email ? (advisor.name + " (" + advisor.email + ")") : advisor.name;
+    infoSpan.textContent = advisor.name;
 
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
     removeBtn.className = "btn btn-danger";
     removeBtn.textContent = "remove";
     removeBtn.addEventListener("click", function () {
-      appState.advisors.splice(i, 1);
-      if (appState.selectedAdvisorIndex === i) {
-        appState.selectedAdvisorIndex = -1;
-      }
-      saveSettingsToStorage();
-      renderAdvisorPills();
-      renderSettingsAdvisorList();
-      updateEmailPreview();
+      removeAdvisorAtIndex(i);
     });
 
     row.appendChild(infoSpan);
@@ -493,21 +559,54 @@ function renderServiceChips() {
   });
 }
 
-function renderTemplatePicker() {
-  const select = document.getElementById("template-select");
-  if (!select) return;
-  const query = (document.getElementById("template-search") || {}).value || "";
-  const previous = select.value;
-  select.innerHTML = "";
-  appState.templates.filter(function (template) {
-    return (template.name + " " + template.category).toLowerCase().includes(query.trim().toLowerCase());
-  }).forEach(function (template) {
-    const option = document.createElement("option");
-    option.value = template.id;
-    option.textContent = template.category ? template.name + " · " + template.category : template.name;
-    select.appendChild(option);
+function getTemplatesForMode(mode) {
+  const targetMode = mode || appState.mode || "quote";
+  return appState.templates.filter(function (template) {
+    return inferTemplateMode(template) === targetMode;
   });
-  if (appState.templates.some(function (template) { return template.id === previous; })) select.value = previous;
+}
+
+function setActiveModeUi(mode) {
+  appState.mode = mode;
+  const modeButtons = document.querySelectorAll(".mode-btn");
+  for (let i = 0; i < modeButtons.length; i++) {
+    modeButtons[i].classList.toggle("active", modeButtons[i].getAttribute("data-mode") === mode);
+  }
+  const notesLabel = document.getElementById("custom-notes-label");
+  if (notesLabel) {
+    if (mode === "quote") {
+      notesLabel.textContent = "additional service details / quote notes";
+    } else if (mode === "status") {
+      notesLabel.textContent = "status inquiry details (e.g. dropped off this morning)";
+    } else {
+      notesLabel.textContent = "callback reason / message for advisor";
+    }
+  }
+}
+
+function renderTemplateVariationPills() {
+  const container = document.getElementById("template-variation-pills");
+  if (!container) return;
+  const modeTemplates = getTemplatesForMode(appState.mode);
+  if (modeTemplates.length > 0 && !modeTemplates.some(function (t) { return t.id === appState.activeTemplateId; })) {
+    appState.activeTemplateId = modeTemplates[0].id;
+  } else if (modeTemplates.length === 0) {
+    appState.activeTemplateId = "";
+  }
+  container.innerHTML = "";
+  modeTemplates.forEach(function (template) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "chip";
+    if (template.id === appState.activeTemplateId) {
+      button.classList.add("active");
+    }
+    button.textContent = template.name;
+    button.addEventListener("click", function () {
+      selectEmailTemplate(template.id);
+    });
+    container.appendChild(button);
+  });
 }
 
 function renderCategoryOptions() {
@@ -527,15 +626,20 @@ function renderSettingsTemplateList() {
   const query = (document.getElementById("settings-template-search") || {}).value || "";
   list.innerHTML = "";
   appState.templates.filter(function (template) {
-    return (template.name + " " + template.category + " " + template.subject).toLowerCase().includes(query.trim().toLowerCase());
+    const modeLabel = formatModeLabel(inferTemplateMode(template));
+    return (template.name + " " + modeLabel + " " + template.subject).toLowerCase().includes(query.trim().toLowerCase());
   }).forEach(function (template) {
     const row = document.createElement("div");
     row.className = "settings-row";
     const info = document.createElement("span");
-    info.textContent = template.name + (template.category ? " · " + template.category : "");
+    info.textContent = template.name + " · " + formatModeLabel(inferTemplateMode(template));
     const actions = document.createElement("div");
     actions.className = "row-actions";
-    [["fill", function () { fillEmailTemplate(template.id); }], ["edit", function () { openTemplateEditor(template); }], ["delete", function () {
+    [["use", function () {
+      selectEmailTemplate(template.id);
+      const modal = document.getElementById("settings-modal");
+      if (modal) modal.classList.add("hidden");
+    }], ["edit", function () { openTemplateEditor(template); }], ["delete", function () {
       if (!window.confirm("Delete template ‘" + template.name + "’?")) return;
       appState.templates = appState.templates.filter(function (item) { return item.id !== template.id; });
       if (appState.activeTemplateId === template.id) appState.activeTemplateId = "";
@@ -545,7 +649,7 @@ function renderSettingsTemplateList() {
     }]].forEach(function (action) {
       const button = document.createElement("button");
       button.type = "button";
-      button.className = "btn btn-secondary btn-small";
+      button.className = action[0] === "delete" ? "btn btn-danger btn-small" : "btn btn-secondary btn-small";
       button.textContent = action[0];
       button.addEventListener("click", action[1]);
       actions.appendChild(button);
@@ -661,7 +765,7 @@ function renderSettingsCategoryList() {
 }
 
 function renderTemplateManagement() {
-  renderTemplatePicker();
+  renderTemplateVariationPills();
   renderSettingsTemplateList();
   renderCategoryOptions();
   renderSettingsCategoryList();
@@ -673,26 +777,35 @@ function renderServiceManagement() {
 }
 
 function openTemplateEditor(template) {
+  const modal = document.getElementById("settings-modal");
+  if (modal) modal.classList.remove("hidden");
   const editor = document.getElementById("template-editor");
   if (!editor) return;
-  appState.editingTemplateId = template ? template.id : "";
-  document.getElementById("template-name-input").value = template ? template.name : "";
-  document.getElementById("template-category-input").value = template ? (template.category || "") : "";
-  document.getElementById("template-subject-input").value = template ? template.subject : "";
-  document.getElementById("template-body-input").value = template ? template.body : "";
+  appState.editingTemplateId = template ? (template.id || "") : "";
+  document.getElementById("template-name-input").value = template ? (template.name || "") : "";
+  const modeSelect = document.getElementById("template-mode-input");
+  if (modeSelect) {
+    modeSelect.value = template ? inferTemplateMode(template) : (appState.mode || "quote");
+  }
+  document.getElementById("template-subject-input").value = template ? (template.subject || "") : "";
+  document.getElementById("template-body-input").value = template ? (template.body || "") : "";
   editor.classList.remove("hidden");
+  if (typeof editor.scrollIntoView === "function") {
+    editor.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
   document.getElementById("template-name-input").focus();
 }
 
-function fillEmailTemplate(templateId) {
+function selectEmailTemplate(templateId) {
   const template = appState.templates.find(function (item) { return item.id === templateId; });
-  const select = document.getElementById("template-select");
   if (!template) return;
-  if (select) select.value = templateId;
+  const mode = inferTemplateMode(template);
+  setActiveModeUi(mode);
   appState.activeTemplateId = templateId;
   appState.previewEdited = false;
+  renderTemplateVariationPills();
   updateEmailPreview();
-  showToast("filled saved template: " + template.name + ".");
+  showToast("selected template: " + template.name + ".");
 }
 
 function makeReusableTemplateText(value) {
@@ -707,6 +820,7 @@ function makeReusableTemplateText(value) {
   ].filter(function (pair) { return pair[0]; }).sort(function (a, b) { return b[0].length - a[0].length; });
   let reusable = value;
   values.forEach(function (pair) { reusable = reusable.split(pair[0]).join(pair[1]); });
+  reusable = reusable.replace(/^Customer #:\s*\{\{customerNumber\}\}$/m, "{{customerNumberLine}}");
   const customerAndNumber = document.getElementById("customer-number").value.trim()
     ? "{{customerNumber}} {{customerName}}"
     : "{{customerName}}";
@@ -743,8 +857,6 @@ function getRequestedServicesText() {
 // put together the subject line and email body live as i type
 function updateEmailPreview() {
   const advisorNameEl = document.getElementById("advisor-name-input");
-  const advisorEmailEl = document.getElementById("advisor-email-input");
-  const ccEmailEl = document.getElementById("cc-email-input");
   const customerNameEl = document.getElementById("customer-name");
   const customerPhoneEl = document.getElementById("customer-phone");
   const customerNumberEl = document.getElementById("customer-number");
@@ -753,16 +865,6 @@ function updateEmailPreview() {
   let advisorName = "[Service Advisor]";
   if (advisorNameEl && advisorNameEl.value.trim() !== "") {
     advisorName = advisorNameEl.value.trim();
-  }
-
-  let advisorEmail = "";
-  if (advisorEmailEl && advisorEmailEl.value.trim() !== "") {
-    advisorEmail = advisorEmailEl.value.trim();
-  }
-
-  let ccEmail = "";
-  if (ccEmailEl && ccEmailEl.value.trim() !== "") {
-    ccEmail = parseEmailList(ccEmailEl.value).join(", ");
   }
 
   let customerName = "[Customer Name]";
@@ -786,7 +888,6 @@ function updateEmailPreview() {
   }
 
   const serviceDetails = getRequestedServicesText();
-
   const subjectCustomer = customerNumber !== "" ? (customerNumber + " " + customerName) : customerName;
 
   let subjectLine = "";
@@ -823,14 +924,15 @@ function updateEmailPreview() {
     bodyLines.push(appState.signature);
   }
 
-  const previewTo = document.getElementById("preview-to");
-  const previewCc = document.getElementById("preview-cc");
   const previewSubject = document.getElementById("preview-subject");
   const previewBody = document.getElementById("preview-body");
   let previewSubjectValue = subjectLine;
   let previewBodyValue = bodyLines.join("\n");
-  const activeTemplate = appState.templates.find(function (template) { return template.id === appState.activeTemplateId; });
+  const modeTemplates = getTemplatesForMode(appState.mode);
+  const activeTemplate = modeTemplates.find(function (template) { return template.id === appState.activeTemplateId; }) || modeTemplates[0] || null;
   if (activeTemplate && !appState.previewEdited) {
+    appState.activeTemplateId = activeTemplate.id;
+    const signatureTrimmed = appState.signature ? appState.signature.trim() : "";
     const replacements = {
       customerName: customerName,
       customerNumber: customerNumber,
@@ -840,23 +942,31 @@ function updateEmailPreview() {
       advisorName: advisorName,
       serviceDetails: serviceDetails,
       customerAndNumber: subjectCustomer,
-      signature: appState.signature.trim()
+      signature: signatureTrimmed
     };
     const fill = function (text) {
-      return text.replace(/{{\s*([a-zA-Z]+)\s*}}/g, function (match, key) {
-        return Object.prototype.hasOwnProperty.call(replacements, key) ? replacements[key] : match;
-      });
+      const renderedLines = [];
+      const rawLines = String(text || "").replace(/\r\n/g, "\n").split("\n");
+      for (let i = 0; i < rawLines.length; i++) {
+        const line = rawLines[i];
+        const trimmedLine = line.trim();
+        if (trimmedLine === "{{customerNumberLine}}" && customerNumber === "") {
+          continue;
+        }
+        if (trimmedLine === "{{signature}}" && signatureTrimmed === "") {
+          continue;
+        }
+        const replaced = line.replace(/{{\s*([a-zA-Z]+)\s*}}/g, function (match, key) {
+          return Object.prototype.hasOwnProperty.call(replacements, key) ? replacements[key] : match;
+        });
+        renderedLines.push(replaced);
+      }
+      return renderedLines.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd();
     };
     previewSubjectValue = fill(activeTemplate.subject);
     previewBodyValue = fill(activeTemplate.body);
   }
 
-  if (previewTo) {
-    previewTo.value = advisorEmail;
-  }
-  if (previewCc) {
-    previewCc.value = ccEmail;
-  }
   if (previewSubject && !appState.previewEdited) {
     previewSubject.value = previewSubjectValue;
   }
@@ -1938,6 +2048,7 @@ function resetCallForm() {
     vinHelper.textContent = "paste full vin or 7 chars for awp";
   }
 
+  appState.previewEdited = false;
   updateEmailPreview();
   showToast("cleared form for new incoming call.");
 }
@@ -1951,8 +2062,6 @@ function initializeDashboardEvents() {
     renderAdvisorPills();
   }
   renderSettingsAdvisorList();
-  renderCcPills();
-  renderSettingsCcList();
   renderTemplateManagement();
   renderServiceManagement();
 
@@ -1965,24 +2074,12 @@ function initializeDashboardEvents() {
   const modeButtons = document.querySelectorAll(".mode-btn");
   for (let i = 0; i < modeButtons.length; i++) {
     modeButtons[i].addEventListener("click", function () {
-      for (let j = 0; j < modeButtons.length; j++) {
-        modeButtons[j].classList.remove("active");
-      }
-      modeButtons[i].classList.add("active");
-      appState.mode = modeButtons[i].getAttribute("data-mode");
-      appState.activeTemplateId = "";
+      const nextMode = modeButtons[i].getAttribute("data-mode");
+      setActiveModeUi(nextMode);
+      const modeTemplates = getTemplatesForMode(nextMode);
+      appState.activeTemplateId = modeTemplates.length > 0 ? modeTemplates[0].id : "";
       appState.previewEdited = false;
-
-      const notesLabel = document.getElementById("custom-notes-label");
-      if (notesLabel) {
-        if (appState.mode === "quote") {
-          notesLabel.textContent = "additional service details / quote notes";
-        } else if (appState.mode === "status") {
-          notesLabel.textContent = "status inquiry details (e.g. dropped off this morning)";
-        } else {
-          notesLabel.textContent = "callback reason / message for advisor";
-        }
-      }
+      renderTemplateVariationPills();
       updateEmailPreview();
     });
   }
@@ -1990,26 +2087,41 @@ function initializeDashboardEvents() {
   const serviceSearch = document.getElementById("service-search");
   if (serviceSearch) serviceSearch.addEventListener("input", renderServiceChips);
 
-  const templateSearch = document.getElementById("template-search");
-  if (templateSearch) templateSearch.addEventListener("input", renderTemplatePicker);
-  const fillTemplateBtn = document.getElementById("fill-template-btn");
-  if (fillTemplateBtn) fillTemplateBtn.addEventListener("click", function () {
-    fillEmailTemplate(document.getElementById("template-select").value);
-  });
+  const manageTemplatesInlineBtn = document.getElementById("manage-templates-inline-btn");
+  if (manageTemplatesInlineBtn) {
+    manageTemplatesInlineBtn.addEventListener("click", function () {
+      const modal = document.getElementById("settings-modal");
+      if (modal) modal.classList.remove("hidden");
+      const sec = document.getElementById("settings-templates-section");
+      if (sec && typeof sec.scrollIntoView === "function") {
+        sec.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+  }
+
+  const quickAddAdvisorBtn = document.getElementById("quick-add-advisor-btn");
+  if (quickAddAdvisorBtn) {
+    quickAddAdvisorBtn.addEventListener("click", function () {
+      const nameEl = document.getElementById("advisor-name-input");
+      if (nameEl) {
+        addOrSelectAdvisorByName(nameEl.value);
+      }
+    });
+  }
+
   const saveTemplateBtn = document.getElementById("save-template-btn");
   if (saveTemplateBtn) saveTemplateBtn.addEventListener("click", function () {
     openTemplateEditor({
+      id: "",
+      mode: appState.mode,
       name: "",
-      category: "",
       subject: makeReusableTemplateText(document.getElementById("preview-subject").value),
       body: makeReusableTemplateText(document.getElementById("preview-body").value)
     });
-    appState.editingTemplateId = "";
   });
   const newTemplateBtn = document.getElementById("new-template-btn");
   if (newTemplateBtn) newTemplateBtn.addEventListener("click", function () {
-    openTemplateEditor({ name: "", category: "", subject: "", body: "" });
-    appState.editingTemplateId = "";
+    openTemplateEditor({ id: "", mode: appState.mode, name: "", subject: "", body: "" });
   });
   const templateListSearch = document.getElementById("settings-template-search");
   if (templateListSearch) templateListSearch.addEventListener("input", renderSettingsTemplateList);
@@ -2019,22 +2131,25 @@ function initializeDashboardEvents() {
   if (saveTemplateEditorBtn) saveTemplateEditorBtn.addEventListener("click", function () {
     const name = document.getElementById("template-name-input").value.trim();
     if (!name) { showToast("enter a template name."); return; }
-    const category = document.getElementById("template-category-input").value.trim();
-    if (category && !appState.categories.some(function (item) { return item.toLowerCase() === category.toLowerCase(); })) appState.categories.push(category);
+    const modeSelect = document.getElementById("template-mode-input");
+    const mode = modeSelect ? modeSelect.value : (appState.mode || "quote");
     const template = {
       id: appState.editingTemplateId || ("template-" + Date.now()),
+      mode: mode,
       name: name,
-      category: category,
       subject: document.getElementById("template-subject-input").value,
       body: document.getElementById("template-body-input").value
     };
     const existing = appState.templates.findIndex(function (item) { return item.id === template.id; });
     if (existing === -1) appState.templates.push(template);
     else appState.templates[existing] = template;
+    setActiveModeUi(mode);
+    appState.activeTemplateId = template.id;
+    appState.previewEdited = false;
     saveSettingsToStorage();
     document.getElementById("template-editor").classList.add("hidden");
     renderTemplateManagement();
-    renderTemplatePicker();
+    updateEmailPreview();
     showToast("saved template: " + name + ".");
   });
   const cancelTemplateEditorBtn = document.getElementById("cancel-template-editor-btn");
@@ -2072,8 +2187,6 @@ function initializeDashboardEvents() {
   // update the email preview whenever i type in any text box
   const liveFieldIds = [
     "advisor-name-input",
-    "advisor-email-input",
-    "cc-email-input",
     "customer-name",
     "customer-phone",
     "customer-number",
@@ -2096,10 +2209,6 @@ function initializeDashboardEvents() {
               helper.textContent = "paste full vin or 7 chars for awp";
             }
           }
-        }
-
-        if (liveFieldIds[i] === "cc-email-input") {
-          renderCcPills();
         }
         updateEmailPreview();
       });
@@ -2259,33 +2368,7 @@ function initializeDashboardEvents() {
     });
   }
 
-  // buttons for copying advisor email, cc, subject line, body, and opening mailto
-  const copyEmailAddrBtn = document.getElementById("copy-email-addr-btn");
-  if (copyEmailAddrBtn) {
-    copyEmailAddrBtn.addEventListener("click", async function () {
-      const toEl = document.getElementById("preview-to");
-      if (toEl && toEl.value.trim() !== "") {
-        await navigator.clipboard.writeText(toEl.value.trim());
-        showToast("copied advisor email address.");
-      } else {
-        showToast("select an advisor first.");
-      }
-    });
-  }
-
-  const copyCcBtn = document.getElementById("copy-cc-btn");
-  if (copyCcBtn) {
-    copyCcBtn.addEventListener("click", async function () {
-      const ccEl = document.getElementById("preview-cc");
-      if (ccEl && ccEl.value.trim() !== "") {
-        await navigator.clipboard.writeText(ccEl.value.trim());
-        showToast("copied cc email address(es).");
-      } else {
-        showToast("no cc emails entered.");
-      }
-    });
-  }
-
+  // buttons for copying subject line, body, and opening mailto
   const copySubjectBtn = document.getElementById("copy-subject-btn");
   if (copySubjectBtn) {
     copySubjectBtn.addEventListener("click", async function () {
@@ -2318,19 +2401,9 @@ function initializeDashboardEvents() {
   const openMailtoBtn = document.getElementById("open-mailto-btn");
   if (openMailtoBtn) {
     openMailtoBtn.addEventListener("click", function () {
-      const toEl = document.getElementById("preview-to");
-      const ccEl = document.getElementById("preview-cc");
       const subjEl = document.getElementById("preview-subject");
       const bodyEl = document.getElementById("preview-body");
 
-      let toAddr = "";
-      if (toEl) {
-        toAddr = toEl.value.trim();
-      }
-      let ccAddr = "";
-      if (ccEl) {
-        ccAddr = ccEl.value.trim();
-      }
       let subject = "";
       if (subjEl) {
         subject = encodeURIComponent(subjEl.value);
@@ -2340,11 +2413,7 @@ function initializeDashboardEvents() {
         body = encodeURIComponent(bodyEl.value);
       }
 
-      let mailtoUrl = "mailto:" + toAddr + "?subject=" + subject + "&body=" + body;
-      if (ccAddr !== "") {
-        mailtoUrl = mailtoUrl + "&cc=" + encodeURIComponent(ccAddr);
-      }
-
+      const mailtoUrl = "mailto:?subject=" + subject + "&body=" + body;
       window.location.href = mailtoUrl;
       showToast("opened default mail client. press ctrl+v in body if pasting screenshot.");
     });
@@ -2397,48 +2466,12 @@ function initializeDashboardEvents() {
   if (addAdvisorBtn) {
     addAdvisorBtn.addEventListener("click", function () {
       const nameEl = document.getElementById("new-advisor-name");
-      const emailEl = document.getElementById("new-advisor-email");
-      if (!nameEl || !emailEl) {
+      if (!nameEl) {
         return;
       }
-      const nameVal = nameEl.value.trim();
-      const emailVal = emailEl.value.trim();
-      if (nameVal === "") {
-        showToast("enter advisor name.");
-        return;
+      if (addOrSelectAdvisorByName(nameEl.value)) {
+        nameEl.value = "";
       }
-      appState.advisors.push({ name: nameVal, email: emailVal });
-      nameEl.value = "";
-      emailEl.value = "";
-      saveSettingsToStorage();
-      renderAdvisorPills();
-      renderSettingsAdvisorList();
-      showToast("added advisor " + nameVal + ".");
-    });
-  }
-
-  // add a new quick cc contact to my saved list
-  const addCcBtn = document.getElementById("add-cc-btn");
-  if (addCcBtn) {
-    addCcBtn.addEventListener("click", function () {
-      const nameEl = document.getElementById("new-cc-name");
-      const emailEl = document.getElementById("new-cc-email");
-      if (!nameEl || !emailEl) {
-        return;
-      }
-      const nameVal = nameEl.value.trim();
-      const emailVal = emailEl.value.trim();
-      if (nameVal === "" || emailVal === "") {
-        showToast("enter both cc label and email.");
-        return;
-      }
-      appState.ccContacts.push({ name: nameVal, email: emailVal });
-      nameEl.value = "";
-      emailEl.value = "";
-      saveSettingsToStorage();
-      renderCcPills();
-      renderSettingsCcList();
-      showToast("added cc contact " + nameVal + ".");
     });
   }
 
@@ -2517,8 +2550,8 @@ function initializeDashboardEvents() {
             saveSettingsToStorage();
             renderAdvisorPills();
             renderSettingsAdvisorList();
-            renderCcPills();
-            renderSettingsCcList();
+            renderTemplateManagement();
+            renderServiceManagement();
             updateEmailPreview();
             showToast("imported portable config successfully.");
           }

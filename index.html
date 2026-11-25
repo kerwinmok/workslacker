@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>The BMW Store, MINI &amp; Rolls-Royce | Service Desk</title>
+  <title>Workslacker</title>
   <link rel="stylesheet" href="style.css" />
   <!-- tesseract ocr so i can scan my tekion screenshots -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
@@ -13,13 +13,8 @@
 <body class="dark-theme">
   <header class="topbar">
     <div class="brand-group">
-      <div class="m-stripes" aria-hidden="true">
-        <span class="m-blue"></span>
-        <span class="m-navy"></span>
-        <span class="m-red"></span>
-      </div>
       <div>
-        <h1>The BMW Store, MINI &amp; Rolls-Royce &mdash; Service Desk</h1>
+        <h1>Workslacker</h1>
         <p class="subtitle">paste screenshot &bull; pick advisor &bull; copy email</p>
       </div>
     </div>
@@ -29,7 +24,7 @@
         light mode
       </button>
       <button id="manage-advisors-btn" class="btn btn-secondary" type="button">
-        advisors &amp; cc
+        advisors &amp; templates
       </button>
       <button id="reset-form-btn" class="btn btn-danger" type="button" title="shortcut: alt + r">
         new call (alt+r)
@@ -114,11 +109,11 @@
       </div>
     </section>
 
-    <!-- column 2: service advisor, cc, and problem / request -->
+    <!-- column 2: service advisor, templates, and problem / request -->
     <section class="panel">
       <div class="card">
         <div class="card-header">
-          <h2>3. advisor &amp; cc</h2>
+          <h2>3. advisor &amp; template</h2>
           <span class="badge">step 2</span>
         </div>
 
@@ -135,29 +130,20 @@
         </div>
 
         <div class="template-toolbar">
-          <div class="field-group">
-            <label for="template-search">saved email templates</label>
-            <input type="search" id="template-search" placeholder="search templates..." autocomplete="off" />
+          <div class="template-section-header">
+            <label>saved templates</label>
+            <button type="button" id="manage-templates-inline-btn" class="btn btn-secondary btn-small">+ manage</button>
           </div>
-          <div class="input-with-action">
-            <select id="template-select" aria-label="select saved email template"></select>
-            <button type="button" id="fill-template-btn" class="btn btn-primary">fill</button>
-          </div>
+          <div id="template-variation-pills" class="chip-container"></div>
         </div>
 
         <div class="field-group">
           <label>service advisor</label>
           <div id="advisor-pills" class="chip-container"></div>
-          <div class="advisor-manual-row">
-            <input type="text" id="advisor-name-input" placeholder="advisor name" />
-            <input type="email" id="advisor-email-input" placeholder="advisor@thebmwstore.ca" />
+          <div class="input-with-action">
+            <input type="text" id="advisor-name-input" placeholder="type advisor name or add new..." autocomplete="off" />
+            <button type="button" id="quick-add-advisor-btn" class="btn btn-accent btn-small">+ add</button>
           </div>
-        </div>
-
-        <div class="field-group">
-          <label for="cc-email-input">cc (optional)</label>
-          <div id="cc-pills" class="chip-container"></div>
-          <input type="text" id="cc-email-input" placeholder="cc emails (comma separated)" autocomplete="off" />
         </div>
       </div>
 
@@ -189,26 +175,6 @@
         </div>
 
         <div class="preview-meta-grid">
-          <div class="field-group">
-            <label for="preview-to">to</label>
-            <div class="input-with-action">
-              <input type="text" id="preview-to" readonly placeholder="select an advisor..." />
-              <button type="button" id="copy-email-addr-btn" class="btn btn-accent btn-small">
-                copy to
-              </button>
-            </div>
-          </div>
-
-          <div class="field-group">
-            <label for="preview-cc">cc</label>
-            <div class="input-with-action">
-              <input type="text" id="preview-cc" readonly placeholder="no cc selected" />
-              <button type="button" id="copy-cc-btn" class="btn btn-accent btn-small">
-                copy cc
-              </button>
-            </div>
-          </div>
-
           <div class="field-group">
             <label for="preview-subject">subject</label>
             <div class="input-with-action">
@@ -247,26 +213,33 @@
     </section>
   </main>
 
-  <!-- popup modal where i edit my advisor list, cc presets, and sign-off -->
+  <!-- popup modal where i edit my advisor list, templates, and sign-off -->
   <div id="settings-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
     <div class="modal-card">
       <div class="card-header">
-        <h2 id="settings-title">advisors, cc &amp; signature settings</h2>
+        <h2 id="settings-title">advisors, templates &amp; settings</h2>
         <button type="button" id="close-settings-btn" class="btn btn-secondary">close</button>
       </div>
 
       <div class="modal-body">
-        <section class="settings-section">
+        <section class="settings-section" id="settings-templates-section">
           <div class="settings-section-heading">
-            <div><h3>email templates</h3><p>saved on this device and synced to your usb config</p></div>
+            <div><h3>email templates</h3><p>save 2&ndash;3 variations per update type (synced to your usb config)</p></div>
             <button type="button" id="new-template-btn" class="btn btn-accent">new template</button>
           </div>
           <input type="search" id="settings-template-search" placeholder="search saved templates..." autocomplete="off" />
           <div id="settings-template-list" class="settings-list"></div>
           <div id="template-editor" class="template-editor hidden">
             <div class="template-editor-grid">
-              <div class="field-group"><label for="template-name-input">template name</label><input type="text" id="template-name-input" /></div>
-              <div class="field-group"><label for="template-category-input">category</label><input type="text" id="template-category-input" list="category-options" placeholder="e.g. price quote" /><datalist id="category-options"></datalist></div>
+              <div class="field-group"><label for="template-name-input">template name</label><input type="text" id="template-name-input" placeholder="e.g. Parts ETA Follow-up" /></div>
+              <div class="field-group">
+                <label for="template-mode-input">update type</label>
+                <select id="template-mode-input">
+                  <option value="quote">Price Quote</option>
+                  <option value="status">Status Update</option>
+                  <option value="callback">Callback</option>
+                </select>
+              </div>
             </div>
             <div class="field-group"><label for="template-subject-input">subject</label><input type="text" id="template-subject-input" /></div>
             <div class="field-group"><label for="template-body-input">email body</label><textarea id="template-body-input" rows="10"></textarea></div>
@@ -284,12 +257,13 @@
           <div class="add-service-row">
             <input type="text" id="new-service-name" placeholder="service or problem" />
             <input type="text" id="new-service-category" list="category-options" placeholder="category" />
+            <datalist id="category-options"></datalist>
             <button type="button" id="add-service-btn" class="btn btn-accent">add</button>
           </div>
         </section>
 
         <section class="settings-section">
-          <div class="settings-section-heading"><div><h3>categories</h3><p>organize templates, services, and customer concerns</p></div></div>
+          <div class="settings-section-heading"><div><h3>categories</h3><p>organize services and customer concerns</p></div></div>
           <div id="settings-category-list" class="settings-list"></div>
           <div class="add-category-row"><input type="text" id="new-category-name" placeholder="new category" /><button type="button" id="add-category-btn" class="btn btn-accent">add category</button></div>
         </section>
@@ -297,7 +271,7 @@
         <hr class="divider" />
         <div class="field-group">
           <label for="signature-input">thank-you sign-off</label>
-          <textarea id="signature-input" rows="3" placeholder="Thank you,\nKerwin\nService Coordinator | The BMW Store"></textarea>
+          <textarea id="signature-input" rows="3" placeholder="Optional sign-off (leave blank if Outlook adds your signature)"></textarea>
         </div>
 
         <hr class="divider" />
@@ -307,22 +281,8 @@
           <div id="settings-advisor-list" class="settings-advisor-list"></div>
 
           <div class="add-advisor-row">
-            <input type="text" id="new-advisor-name" placeholder="advisor name (e.g. Alex)" />
-            <input type="email" id="new-advisor-email" placeholder="alex@thebmwstore.ca" />
+            <input type="text" id="new-advisor-name" placeholder="advisor name (e.g. David Kung)" />
             <button type="button" id="add-advisor-btn" class="btn btn-accent">add advisor</button>
-          </div>
-        </div>
-
-        <hr class="divider" />
-
-        <div class="field-group">
-          <label>saved quick cc contacts (advisors.json)</label>
-          <div id="settings-cc-list" class="settings-advisor-list"></div>
-
-          <div class="add-advisor-row">
-            <input type="text" id="new-cc-name" placeholder="label (e.g. Dispatch)" />
-            <input type="email" id="new-cc-email" placeholder="dispatch@thebmwstore.ca" />
-            <button type="button" id="add-cc-btn" class="btn btn-accent">add cc</button>
           </div>
         </div>
 

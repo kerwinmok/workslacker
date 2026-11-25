@@ -63,32 +63,6 @@ body {
   gap: 0.9rem;
 }
 
-/* little bmw m stripes on the top left */
-.m-stripes {
-  display: flex;
-  gap: 3px;
-  height: 30px;
-}
-
-.m-stripes span {
-  width: 6px;
-  height: 100%;
-  border-radius: 2px;
-  transform: skewX(-16deg);
-}
-
-.m-blue {
-  background-color: #0066b1;
-}
-
-.m-navy {
-  background-color: #1c3966;
-}
-
-.m-red {
-  background-color: #e22718;
-}
-
 .topbar h1 {
   font-size: 1.15rem;
   font-weight: 700;
@@ -251,13 +225,6 @@ textarea:focus {
   gap: 0.4rem;
 }
 
-.advisor-manual-row {
-  display: grid;
-  grid-template-columns: 1fr 1.4fr;
-  gap: 0.4rem;
-  margin-top: 0.25rem;
-}
-
 .helper-text {
   font-size: 0.72rem;
   color: var(--text-muted);
@@ -290,6 +257,40 @@ textarea:focus {
   background-color: var(--chip-active);
   border-color: var(--chip-active);
   color: #ffffff;
+}
+
+.advisor-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.28rem 0.45rem 0.28rem 0.65rem;
+}
+
+.chip-name-btn {
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.chip-remove-btn {
+  background: none;
+  border: none;
+  color: inherit;
+  opacity: 0.6;
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 0.05rem 0.22rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.chip-remove-btn:hover {
+  opacity: 1;
+  background-color: rgba(226, 39, 24, 0.22);
+  color: #ff6b60;
 }
 
 /* general button styles */
@@ -445,13 +446,17 @@ textarea:focus {
 }
 
 .template-toolbar {
-  padding-bottom: 0.8rem;
+  padding-bottom: 0.55rem;
   border-bottom: 1px solid var(--border-color);
 }
 
-.template-toolbar .input-with-action { margin-top: 0.35rem; }
-.template-toolbar select { flex: 1; min-width: 0; }
-.template-toolbar .btn { min-width: 68px; }
+.template-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
 
 .settings-section { display: flex; flex-direction: column; gap: 0.55rem; }
 .settings-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
@@ -550,7 +555,7 @@ select:focus, input:focus, textarea:focus { outline: none; border-color: var(--b
 
 .add-advisor-row {
   display: grid;
-  grid-template-columns: 1fr 1.3fr auto;
+  grid-template-columns: 1fr auto;
   gap: 0.4rem;
   margin-top: 0.35rem;
 }
