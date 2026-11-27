@@ -104,6 +104,10 @@
                      {
                          "name":  "Warning Light / Diagnostics",
                          "category":  "Diagnostics"
+                     },
+                     {
+                         "name":  "Extended Warranty Inquiry",
+                         "category":  "Customer Concern"
                      }
                  ],
     "categories":  [

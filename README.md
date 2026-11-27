@@ -12,7 +12,7 @@ i built this tool to speed up my daily workflow at the bmw, mini & rolls-royce s
 
 ## how it works
 
-1. **clipboard ocr & text parser (`app.js`):** hitting `ctrl + v` with an image normalizes screenshot contrast, runs two tesseract.js passes (standard and sparse text), and passes cleaned text through `parseTekionOrAwpText` (or parses raw pasted text directly). it removes stray OCR symbols, cleans common vin lookalikes (`O`/`Q` -> `0`, `I` -> `1`), normalizes phone formats to `XXX-XXX-XXXX`, and ranks name/number candidates while avoiding model years and unrelated vehicle details.
+1. **clipboard ocr & text parser (`app.js`):** hitting `ctrl + v` with an image normalizes screenshot contrast, runs two tesseract.js passes (standard and sparse text), and passes cleaned text through `parseTekionOrAwpText` (or parses raw pasted text directly). OCR work is capped at four megapixels, overlapping scans are cancelled, and reset/clear terminates the worker and releases image buffers. it removes stray OCR symbols, cleans common vin lookalikes (`O`/`Q` -> `0`, `I` -> `1`), normalizes phone formats to `XXX-XXX-XXXX`, and ranks name/number candidates while avoiding model years and unrelated vehicle details.
 2. **awp & advisor formatting:** calculates `awp last 7 digits` live from any full 17-character bmw (`WBA...`), mini (`WMW...`, `WMZ...`), or rolls-royce (`SCA...`) vin and rebuilds `To`, `CC`, `Subject`, and the editable email body on every input or chip toggle.
 3. **portable usb storage (`workslacker.bat` & `advisors-config.js`):** running `workslacker.bat` launches a hidden powershell tcp server on `127.0.0.1` paired with chrome `--app` mode (falling back to edge/default browser) so edits to advisors or cc presets auto-save straight back to `advisors.json` and `advisors-config.js` on the usb drive.
 
@@ -47,7 +47,7 @@ if work IT restricts `.bat` files, powershell, or usb execution, there are five 
 - use **save current email as template** or **advisors & cc → new template** to create one; edit, fill, and delete saved templates in the settings list.
 - templates support `{{customerName}}`, `{{customerNumber}}`, `{{customerNumberLine}}`, `{{customerPhone}}`, `{{vin}}`, `{{advisorName}}`, `{{serviceDetails}}`, `{{customerAndNumber}}`, and `{{signature}}`. the body is stored as plain text with line breaks intact, then copied using the existing plain or rich email actions.
 - generated email bodies label notes as **Customer Concerns:**.
-- add, edit, search, and remove service or problem quick picks in settings. Categories can be managed there and assigned to templates and quick picks.
+- add, edit, search, and remove service or problem quick picks in settings. Categories can be managed there and assigned to templates and quick picks. A selectable **Extended Warranty Inquiry** concern is included for customers who want an advisor to discuss purchase options.
 - use **edit advisors** beside the advisor selector to rename, add, or remove advisors; advisor pills only select an advisor and no longer contain a remove button.
 - saved templates, services, and categories use browser `localStorage`; when launched with `workslacker.bat`, the same data is included in the portable `advisors.json` and `advisors-config.js` sync/export.
 

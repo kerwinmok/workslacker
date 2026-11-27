@@ -105,6 +105,10 @@ window.USB_SAVED_CONFIG = {
                      {
                          "name":  "Warning Light / Diagnostics",
                          "category":  "Diagnostics"
+                     },
+                     {
+                         "name":  "Extended Warranty Inquiry",
+                         "category":  "Customer Concern"
                      }
                  ],
     "categories":  [
