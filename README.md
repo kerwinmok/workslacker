@@ -5,10 +5,10 @@ i built this tool to speed up my daily workflow at the bmw, mini & rolls-royce s
 ## screenshots
 
 ### service desk dashboard
-![Service Desk Dashboard with sample customer information](docs/images/dashboard-updated.jpg)
+![Current service desk dashboard with sample customer information](docs/images/dashboard-current.png)
 
-### templates, services & settings
-![Email templates, service quick picks, and categories](docs/images/settings-updated.jpg)
+### advisor, template, and settings management
+![Current advisor and template settings view](docs/images/settings-current.png)
 
 ## how it works
 
@@ -46,6 +46,7 @@ if work IT restricts `.bat` files, powershell, or usb execution, there are five 
 - choose a saved template from the service desk or search by name/category, then click **fill** to populate the subject and body.
 - use **save current email as template** or **advisors & cc → new template** to create one; edit, fill, and delete saved templates in the settings list.
 - templates support `{{customerName}}`, `{{customerNumber}}`, `{{customerNumberLine}}`, `{{customerPhone}}`, `{{vin}}`, `{{advisorName}}`, `{{serviceDetails}}`, `{{customerAndNumber}}`, and `{{signature}}`. the body is stored as plain text with line breaks intact, then copied using the existing plain or rich email actions.
+- generated email bodies label notes as **Customer Concerns:**.
 - add, edit, search, and remove service or problem quick picks in settings. Categories can be managed there and assigned to templates and quick picks.
 - use **edit advisors** beside the advisor selector to rename, add, or remove advisors; advisor pills only select an advisor and no longer contain a remove button.
 - saved templates, services, and categories use browser `localStorage`; when launched with `workslacker.bat`, the same data is included in the portable `advisors.json` and `advisors-config.js` sync/export.
