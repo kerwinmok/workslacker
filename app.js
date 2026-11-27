@@ -380,6 +380,36 @@ function removeAdvisorAtIndex(idx) {
   showToast("removed advisor " + (removed ? removed.name : "") + ".");
 }
 
+function updateAdvisorNameAtIndex(idx, rawName) {
+  const trimmed = String(rawName || "").trim();
+  if (idx < 0 || idx >= appState.advisors.length || trimmed === "") {
+    showToast("enter an advisor name.");
+    return false;
+  }
+
+  const duplicateIdx = appState.advisors.findIndex(function (advisor, advisorIdx) {
+    return advisorIdx !== idx && advisor && advisor.name && advisor.name.toLowerCase() === trimmed.toLowerCase();
+  });
+  if (duplicateIdx !== -1) {
+    showToast("that advisor is already in the list.");
+    return false;
+  }
+
+  appState.advisors[idx].name = trimmed;
+  if (appState.selectedAdvisorIndex === idx) {
+    const nameInput = document.getElementById("advisor-name-input");
+    if (nameInput) {
+      nameInput.value = trimmed;
+    }
+  }
+  saveSettingsToStorage();
+  renderAdvisorPills();
+  renderSettingsAdvisorList();
+  updateEmailPreview();
+  showToast("updated advisor " + trimmed + ".");
+  return true;
+}
+
 // pull the latest advisors.json from my local usb server so changes carry across pcs
 async function syncConfigFromUsbServer() {
   if (!isLocalUsbServer()) {
@@ -464,7 +494,7 @@ function showToast(messageText) {
   toastEl.textContent = messageText;
 }
 
-// build the advisor pills with quick select and inline remove
+// build the advisor pills for quick selection
 function renderAdvisorPills() {
   const container = document.getElementById("advisor-pills");
   if (!container) {
@@ -488,19 +518,7 @@ function renderAdvisorPills() {
       selectAdvisorByIndex(i);
     });
 
-    const removeBtn = document.createElement("button");
-    removeBtn.type = "button";
-    removeBtn.className = "chip-remove-btn";
-    removeBtn.textContent = "\u00d7";
-    removeBtn.title = "remove " + advisor.name;
-    removeBtn.setAttribute("aria-label", "remove " + advisor.name);
-    removeBtn.addEventListener("click", function (event) {
-      event.stopPropagation();
-      removeAdvisorAtIndex(i);
-    });
-
     pill.appendChild(nameBtn);
-    pill.appendChild(removeBtn);
     container.appendChild(pill);
   }
 }
@@ -518,8 +536,18 @@ function renderSettingsAdvisorList() {
     const row = document.createElement("div");
     row.className = "advisor-row-item";
 
-    const infoSpan = document.createElement("span");
-    infoSpan.textContent = advisor.name;
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.value = advisor.name;
+    nameInput.setAttribute("aria-label", "advisor name");
+
+    const saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.className = "btn btn-secondary";
+    saveBtn.textContent = "save";
+    saveBtn.addEventListener("click", function () {
+      updateAdvisorNameAtIndex(i, nameInput.value);
+    });
 
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
@@ -529,7 +557,8 @@ function renderSettingsAdvisorList() {
       removeAdvisorAtIndex(i);
     });
 
-    row.appendChild(infoSpan);
+    row.appendChild(nameInput);
+    row.appendChild(saveBtn);
     row.appendChild(removeBtn);
     listEl.appendChild(row);
   }
@@ -1208,7 +1237,7 @@ function extractAndCleanVin(rawText) {
   return result;
 }
 
-// normalize a variable-length customer # token (3-10 digits, preserves internal dashes, strips #, brackets, spaces)
+// normalize a variable-length customer # token (2-7 digits, preserves internal dashes, strips #, brackets, spaces)
 function cleanCustomerNumberToken(rawToken) {
   if (!rawToken) {
     return "";
@@ -1225,7 +1254,7 @@ function cleanCustomerNumberToken(rawToken) {
   }
 
   const digitsOnly = cleaned.replace(/\D/g, "");
-  if (digitsOnly.length < 3 || digitsOnly.length > 10) {
+  if (digitsOnly.length < 2 || digitsOnly.length > 7) {
     return "";
   }
 
@@ -1255,7 +1284,7 @@ function isNonCustomerNameText(text) {
   return NON_NAME_WORD_REGEX.test(text);
 }
 
-// clean up all-caps names from tekion (e.g. SMITH, JOHN -> John Smith)
+// clean up all-caps names from tekion (e.g. SMITH, JOHN M -> John M Smith)
 function normalizeCustomerName(rawName) {
   let cleaned = rawName.replace(/\s+/g, " ").trim();
   // remove trailing punctuation and brackets left after stripping customer #
@@ -1264,11 +1293,11 @@ function normalizeCustomerName(rawName) {
     return "";
   }
 
-  // handle "LAST, FIRST" format
+  // handle "LAST, FIRST MIDDLE" format
   const commaParts = cleaned.split(",");
-  if (commaParts.length === 2) {
+  if (commaParts.length >= 2) {
     const lastPart = commaParts[0].trim();
-    const firstPart = commaParts[1].trim();
+    const firstPart = commaParts.slice(1).join(" ").trim();
     if (firstPart !== "" && lastPart !== "") {
       cleaned = firstPart + " " + lastPart;
     }
@@ -1386,7 +1415,7 @@ function stripLeadingAvatarInitials(text) {
   return String(text).replace(/^[([{\s]*[A-Z]{2}[)\]}\s]+(?=[A-Z][a-z].*\s+[A-Z][a-z])/, "").trim();
 }
 
-// clean ocr icon artifacts from an unlabeled tekion name candidate and validate 2-4 capitalized words
+// clean ocr icon artifacts from an unlabeled tekion name candidate and validate a full name
 function extractCleanPersonNameCandidate(rawSegment) {
   if (!rawSegment || /[A-Za-z0-9]@[A-Za-z0-9]/.test(rawSegment) || /\b(?:19|20)\d{2}\b/.test(rawSegment) || isNonCustomerNameText(rawSegment)) {
     return "";
@@ -1419,7 +1448,7 @@ function extractCleanPersonNameCandidate(rawSegment) {
   }
 
   const words = cand.split(/\s+/);
-  if (words.length < 2 || words.length > 4) {
+  if (words.length < 2 || words.length > 6) {
     return "";
   }
 
@@ -1524,8 +1553,60 @@ function findBestUnlabeledPersonName(rawBlock, scrubbedBlock, phoneInfo) {
   return phoneAdjacentCandidate !== "" ? phoneAdjacentCandidate : firstCandidate;
 }
 
+function findBestUnlabeledCustomerNumber(rawText, customerName) {
+  const lines = String(rawText || "").split(/\r?\n/);
+  const normalizedName = String(customerName || "").toLowerCase();
+  const candidates = [];
+  const excludedContext = /\b(?:vin|phone|tel|cell|fax|odometer|mileage|model|year|ro|repair order|tag|plate|appointment|date|time|stock)\b/i;
+  const numberRegex = /(?:^|[^\dA-Za-z])([#(\[]?\s*\d+(?:[-\u2013\u2014]\d+)*\s*[)\]]?)(?=$|[^\dA-Za-z])/g;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (excludedContext.test(line)) {
+      continue;
+    }
+
+    const lineHasName = (normalizedName !== "" && line.toLowerCase().indexOf(normalizedName) !== -1)
+      || extractCleanPersonNameCandidate(line) !== "";
+    let match = numberRegex.exec(line);
+    while (match !== null) {
+      const rawNumber = match[1];
+      const cleanedNumber = cleanCustomerNumberToken(rawNumber);
+      if (cleanedNumber !== "" && isAcceptableCustomerNumber(rawNumber, false)) {
+        const explicitLabel = /\b(?:customer|cust|account|client)\b/i.test(line);
+        let score = explicitLabel ? 120 : (lineHasName ? 90 : 0);
+
+        if (score === 0) {
+          for (let adjacent = Math.max(0, i - 1); adjacent <= Math.min(lines.length - 1, i + 1); adjacent++) {
+            if (adjacent === i || excludedContext.test(lines[adjacent])) {
+              continue;
+            }
+            if ((normalizedName !== "" && lines[adjacent].toLowerCase().indexOf(normalizedName) !== -1)
+              || extractCleanPersonNameCandidate(lines[adjacent]) !== "") {
+              score = 55;
+              break;
+            }
+          }
+        }
+
+        if (score > 0) {
+          candidates.push({ value: cleanedNumber, score: score, position: i });
+        }
+      }
+      match = numberRegex.exec(line);
+    }
+    numberRegex.lastIndex = 0;
+  }
+
+  candidates.sort(function (a, b) {
+    return b.score - a.score || a.position - b.position;
+  });
+  return candidates.length > 0 ? candidates[0].value : "";
+}
+
 // pull out the vin, phone, customer #, and name from ocr or pasted tekion text
 function parseTekionOrAwpText(rawText, options) {
+  rawText = cleanOcrText(rawText);
   if (!rawText || rawText.trim() === "") {
     showToast("no text found to parse.");
     return;
@@ -1575,7 +1656,7 @@ function parseTekionOrAwpText(rawText, options) {
 
   const scrubbedText = scrubNonCustomerText(rawText, vinInfo.matchedTokens);
 
-  // look for explicit customer number label (allows 3-10 digits, brackets, hyphens, #)
+  // look for explicit customer number label (allows 2-7 digits, brackets, hyphens, #)
   const custNumRegex = /(?:customer\s*(?:id|no\.?|num\.?|number|#)|cust\s*(?:id|no\.?|num\.?|number|#)|account\s*(?:id|no\.?|num\.?|number|#)|client\s*(?:id|no\.?|#))[ \t]*[:#=\-\u2013\u2014]*[ \t]*([#(\[]*[ \t]*\d+(?:[\-\u2013\u2014]\d+)*[ \t]*[)\]]*)/i;
   const custNumMatch = scrubbedText.match(custNumRegex);
   if (custNumMatch && isAcceptableCustomerNumber(custNumMatch[1], true)) {
@@ -1634,6 +1715,10 @@ function parseTekionOrAwpText(rawText, options) {
         break;
       }
     }
+  }
+
+  if (foundCustNum === "") {
+    foundCustNum = findBestUnlabeledCustomerNumber(scrubbedText, foundName);
   }
 
   // fallback for unlabeled tekion RO header bars: prioritize rightmost banner column if available, then scan full text
@@ -1805,15 +1890,36 @@ function preprocessImageForOcr(dataUrl) {
           }
         }
 
+        const histogram = new Uint32Array(256);
+        for (let p = 0; p < pixelCount; p++) {
+          histogram[Math.round(rawGray[p])]++;
+        }
+        const percentileGray = function (percentile) {
+          const target = Math.max(1, Math.floor(pixelCount * percentile));
+          let total = 0;
+          for (let gray = 0; gray < histogram.length; gray++) {
+            total += histogram[gray];
+            if (total >= target) {
+              return gray;
+            }
+          }
+          return 255;
+        };
+        const lowGray = percentileGray(0.02);
+        const highGray = percentileGray(0.98);
+        const contrastRange = highGray - lowGray;
+
         let dividers = [];
         if (img.width / img.height >= 3.2) {
           dividers = detectVerticalBannerDividers(rawGray, scaledW, scaledH, scale);
         }
 
-        // gentle contrast stretch around midpoint 128 so thin strokes (like n/i) stay separated
+        // stretch the screenshot's useful tonal range so selected and low-contrast text stays readable
         for (let p = 0; p < pixelCount; p++) {
           const i = p * 4;
-          let contrasted = (rawGray[p] - 128) * 1.32 + 128;
+          let contrasted = contrastRange >= 32
+            ? (rawGray[p] - lowGray) * 255 / contrastRange
+            : (rawGray[p] - 128) * 1.32 + 128;
           if (contrasted < 0) {
             contrasted = 0;
           }
@@ -1908,7 +2014,7 @@ function extractStructuredTextFromOcrData(data) {
   }
   const lines = collectOcrLines(data);
   if (lines.length === 0) {
-    return data.text || "";
+    return cleanOcrText(data.text || "");
   }
 
   const outLines = [];
@@ -1945,9 +2051,22 @@ function extractStructuredTextFromOcrData(data) {
   }
 
   if (outLines.length > 0) {
-    return outLines.join("\n");
+    return cleanOcrText(outLines.join("\n"));
   }
-  return data.text || "";
+  return cleanOcrText(data.text || "");
+}
+
+function cleanOcrText(rawText) {
+  return String(rawText || "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\u00a0/g, " ")
+    .replace(/@{2,}/g, " ")
+    .replace(/(^|[\s|])@(?=$|[\s|])/gm, "$1")
+    .replace(/[ \t]+/g, " ")
+    .replace(/[ \t]*\|[ \t]*/g, " | ")
+    .replace(/^[\s|•]+|[\s|•]+$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 // run tesseract ocr on my screenshot to auto-fill the form
@@ -1980,28 +2099,40 @@ async function runScreenshotOcr() {
     let combinedText = "";
     let preferredNameText = "";
 
-    if (prep.columnDataUrls.length >= 2) {
-      if (typeof window.Tesseract.createWorker === "function") {
-        worker = await window.Tesseract.createWorker("eng");
+    const ocrImages = prep.columnDataUrls.length >= 2
+      ? prep.columnDataUrls
+      : [prep.fullDataUrl];
+    if (typeof window.Tesseract.createWorker === "function") {
+      worker = await window.Tesseract.createWorker("eng");
+    }
+
+    const recognizedTexts = [];
+    for (let i = 0; i < ocrImages.length; i++) {
+      if (worker && typeof worker.setParameters === "function") {
+        await worker.setParameters({ tessedit_pageseg_mode: "6", preserve_interword_spaces: "1" });
       }
-      const colTexts = [];
-      for (let c = 0; c < prep.columnDataUrls.length; c++) {
-        const res = worker
-          ? await worker.recognize(prep.columnDataUrls[c])
-          : await window.Tesseract.recognize(prep.columnDataUrls[c], "eng");
-        const colText = extractStructuredTextFromOcrData(res.data);
-        if (colText.trim() !== "") {
-          colTexts.push(colText);
+      const standardResult = worker
+        ? await worker.recognize(ocrImages[i])
+        : await window.Tesseract.recognize(ocrImages[i], "eng");
+      const standardText = extractStructuredTextFromOcrData(standardResult.data);
+      if (standardText !== "") {
+        recognizedTexts.push(standardText);
+      }
+
+      if (worker && typeof worker.setParameters === "function") {
+        await worker.setParameters({ tessedit_pageseg_mode: "11", preserve_interword_spaces: "1" });
+        const sparseResult = await worker.recognize(ocrImages[i]);
+        const sparseText = extractStructuredTextFromOcrData(sparseResult.data);
+        if (sparseText !== "") {
+          recognizedTexts.push(sparseText);
         }
       }
-      if (colTexts.length > 0) {
-        preferredNameText = colTexts[colTexts.length - 1];
+
+      if (i === ocrImages.length - 1) {
+        preferredNameText = recognizedTexts.slice(-2).join("\n");
       }
-      combinedText = colTexts.join("\n");
-    } else {
-      const result = await window.Tesseract.recognize(prep.fullDataUrl, "eng");
-      combinedText = extractStructuredTextFromOcrData(result.data);
     }
+    combinedText = cleanOcrText(recognizedTexts.join("\n"));
 
     parseTekionOrAwpText(combinedText, { clearPrevious: true, preferredNameText: preferredNameText });
     if (statusText) {
@@ -2547,12 +2678,23 @@ function initializeDashboardEvents() {
 
   // open and close the advisor settings popup
   const manageAdvisorsBtn = document.getElementById("manage-advisors-btn");
+  const editAdvisorsBtn = document.getElementById("edit-advisors-btn");
   const closeSettingsBtn = document.getElementById("close-settings-btn");
   const settingsModal = document.getElementById("settings-modal");
 
   if (manageAdvisorsBtn && settingsModal) {
     manageAdvisorsBtn.addEventListener("click", function () {
       settingsModal.classList.remove("hidden");
+    });
+  }
+
+  if (editAdvisorsBtn && settingsModal) {
+    editAdvisorsBtn.addEventListener("click", function () {
+      settingsModal.classList.remove("hidden");
+      const advisorSection = document.getElementById("settings-advisors-section");
+      if (advisorSection && typeof advisorSection.scrollIntoView === "function") {
+        advisorSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
     });
   }
 

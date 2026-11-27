@@ -12,7 +12,7 @@ i built this tool to speed up my daily workflow at the bmw, mini & rolls-royce s
 
 ## how it works
 
-1. **clipboard ocr & text parser (`app.js`):** hitting `ctrl + v` with an image boosts screenshot contrast on a hidden canvas, runs tesseract.js ocr, and passes the extracted text through `parseTekionOrAwpText` (or parses raw pasted text directly). it cleans common vin ocr mistakes (`O`/`Q` -> `0`, `I` -> `1`), normalizes phone formats to `XXX-XXX-XXXX`, and splits variable-length customer numbers (including brackets, hyphens, or `#`) from customer names while ignoring model years and street lines.
+1. **clipboard ocr & text parser (`app.js`):** hitting `ctrl + v` with an image normalizes screenshot contrast, runs two tesseract.js passes (standard and sparse text), and passes cleaned text through `parseTekionOrAwpText` (or parses raw pasted text directly). it removes stray OCR symbols, cleans common vin lookalikes (`O`/`Q` -> `0`, `I` -> `1`), normalizes phone formats to `XXX-XXX-XXXX`, and ranks name/number candidates while avoiding model years and unrelated vehicle details.
 2. **awp & advisor formatting:** calculates `awp last 7 digits` live from any full 17-character bmw (`WBA...`), mini (`WMW...`, `WMZ...`), or rolls-royce (`SCA...`) vin and rebuilds `To`, `CC`, `Subject`, and the editable email body on every input or chip toggle.
 3. **portable usb storage (`workslacker.bat` & `advisors-config.js`):** running `workslacker.bat` launches a hidden powershell tcp server on `127.0.0.1` paired with chrome `--app` mode (falling back to edge/default browser) so edits to advisors or cc presets auto-save straight back to `advisors.json` and `advisors-config.js` on the usb drive.
 
@@ -36,7 +36,7 @@ if work IT restricts `.bat` files, powershell, or usb execution, there are five 
 
 ## quick workflow
 1. **paste (`ctrl + v`):** take a snip (`win + shift + s`) of the customer profile in tekion/awp or copy text and hit `ctrl + v` anywhere on the app. ocr and text parsing automatically extract:
-   - **customer name & variable-length customer #** (shorter or longer ids like 3–10 digits, hyphens/dashes like `48-2910`, brackets `(4829)` / `[482910]`, or `#9821`)
+   - **customer name & variable-length customer #** (2–7 digit ids, including hyphens like `48-2910`, brackets `(4829)` / `[482910]`, or `#9821`; names may include middle names and additional parts)
    - **phone number** in any format (`6045550199`, `+1 [604] 555-0199`, `604.555.0199`, dashes/spaces) normalized to `604-555-0199`
    - **bmw, mini & rolls-royce vins** (`WBA...`, `WMW...`, `WMZ...`, `SCA...`, etc., plus 7-char awp short vins) with automatic ocr lookalike cleanup (`O`/`Q` -> `0`, `I` -> `1`)
 2. **pick advisor, cc & problem:** the first advisor starts selected automatically (shared across bmw, mini, and rolls-royce), or i click a different advisor pill, add any cc contacts, click quick bmw/mini/rolls-royce service chips, and type the problem notes.
@@ -47,6 +47,7 @@ if work IT restricts `.bat` files, powershell, or usb execution, there are five 
 - use **save current email as template** or **advisors & cc → new template** to create one; edit, fill, and delete saved templates in the settings list.
 - templates support `{{customerName}}`, `{{customerNumber}}`, `{{customerNumberLine}}`, `{{customerPhone}}`, `{{vin}}`, `{{advisorName}}`, `{{serviceDetails}}`, `{{customerAndNumber}}`, and `{{signature}}`. the body is stored as plain text with line breaks intact, then copied using the existing plain or rich email actions.
 - add, edit, search, and remove service or problem quick picks in settings. Categories can be managed there and assigned to templates and quick picks.
+- use **edit advisors** beside the advisor selector to rename, add, or remove advisors; advisor pills only select an advisor and no longer contain a remove button.
 - saved templates, services, and categories use browser `localStorage`; when launched with `workslacker.bat`, the same data is included in the portable `advisors.json` and `advisors-config.js` sync/export.
 
 ## repo files
@@ -56,3 +57,4 @@ if work IT restricts `.bat` files, powershell, or usb execution, there are five 
 - `advisors.json` — saved service advisors, quick cc contacts, and signature
 - `advisors-config.js` — `file://` backup preset script kept in sync alongside `advisors.json`
 - `index.html`, `style.css`, `app.js` — dashboard ui, auto-ocr contrast boost, and email builder
+- `tests/parser.test.cjs` — parser regression tests (`node --test tests/parser.test.cjs`)
