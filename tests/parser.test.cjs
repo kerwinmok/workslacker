@@ -14,8 +14,14 @@ function createParserContext() {
       tagName: tagName,
       className: "",
       children: [],
-      classList: { add: function () {} },
-      addEventListener: function () {},
+      listeners: {},
+      classList: {
+        add: function () {},
+        toggle: function () {}
+      },
+      addEventListener: function (name, listener) {
+        this.listeners[name] = listener;
+      },
       appendChild: function (child) {
         this.children.push(child);
       }
@@ -28,9 +34,10 @@ function createParserContext() {
     return element;
   }
 
-  ["customer-name", "customer-number", "customer-phone", "customer-vin", "vin-helper-text", "advisor-name-input"].forEach(function (id) {
+  ["customer-name", "customer-number", "customer-phone", "customer-vin", "vin-helper-text", "advisor-name-input", "service-search"].forEach(function (id) {
     elements[id] = { value: "", textContent: "" };
   });
+  elements["service-chips"] = createElement("div");
 
   const context = {
     document: {
@@ -41,7 +48,9 @@ function createParserContext() {
       }
     },
     window: {},
-    localStorage: {}
+    localStorage: {
+      getItem: function () { return null; }
+    }
   };
   vm.createContext(context);
   vm.runInContext(appSource + "\nupdateEmailPreview = function () {};", context);
@@ -132,4 +141,115 @@ test("all built-in and previously saved templates use the customer concerns labe
     parser.context
   );
   assert.equal(migrated, "Customer Concerns: {{serviceDetails}}");
+});
+
+test("adds an extended warranty concern to existing saved quick picks", function () {
+  const parser = createParserContext();
+  parser.context.localStorage.getItem = function (key) {
+    if (key === "bmw_service_services_v1") {
+      return JSON.stringify([{ name: "Oil Service", category: "Maintenance" }]);
+    }
+    if (key === "bmw_service_categories_v1") {
+      return JSON.stringify(["Maintenance"]);
+    }
+    return null;
+  };
+  vm.runInContext([
+    "updateEmailPreview = function () {};",
+    "loadSavedSettings();",
+    "renderServiceChips();"
+  ].join("\n"), parser.context);
+
+  const warrantyChip = parser.elements["service-chips"].children.find(function (chip) {
+    return chip.textContent === "Extended Warranty Inquiry";
+  });
+  assert.ok(warrantyChip);
+  assert.equal(warrantyChip.title, "Customer Concern");
+  warrantyChip.listeners.click();
+  assert.equal(
+    vm.runInContext('appState.selectedServices.includes("Extended Warranty Inquiry")', parser.context),
+    true
+  );
+  assert.equal(
+    vm.runInContext('appState.categories.includes("Customer Concern")', parser.context),
+    true
+  );
+});
+
+test("stops a running OCR worker when the screenshot is cleared", async function () {
+  const parser = createParserContext();
+  let resolveRecognition;
+  let terminationCount = 0;
+  let parseCount = 0;
+  parser.context.preprocessImageForOcr = function () {
+    return Promise.resolve({ fullDataUrl: "processed-image", columnDataUrls: [] });
+  };
+  parser.context.parseTekionOrAwpText = function () {
+    parseCount += 1;
+  };
+  parser.context.window.Tesseract = {
+    createWorker: async function () {
+      return {
+        setParameters: async function () {},
+        recognize: function () {
+          return new Promise(function (resolve) {
+            resolveRecognition = resolve;
+          });
+        },
+        terminate: async function () {
+          terminationCount += 1;
+          if (resolveRecognition) {
+            resolveRecognition({ data: { text: "" } });
+          }
+        }
+      };
+    }
+  };
+  vm.runInContext('appState.screenshotDataUrl = "data:image/png;base64,abc";', parser.context);
+  const ocrRun = vm.runInContext("runScreenshotOcr()", parser.context);
+  await new Promise(function (resolve) { setImmediate(resolve); });
+  assert.ok(vm.runInContext("activeScreenshotOcrRun.worker", parser.context));
+
+  vm.runInContext('clearScreenshotPreview("screenshot removed.")', parser.context);
+  await ocrRun;
+
+  assert.equal(terminationCount, 1);
+  assert.equal(parseCount, 0);
+  assert.equal(vm.runInContext("appState.screenshotDataUrl", parser.context), "");
+  assert.equal(vm.runInContext("activeScreenshotOcrRun", parser.context), null);
+});
+
+test("terminates a worker that finishes initializing after reset", async function () {
+  const parser = createParserContext();
+  let resolveWorkerCreation;
+  let terminationCount = 0;
+  parser.context.preprocessImageForOcr = function () {
+    return Promise.resolve({ fullDataUrl: "processed-image", columnDataUrls: [] });
+  };
+  parser.context.window.Tesseract = {
+    createWorker: function () {
+      return new Promise(function (resolve) {
+        resolveWorkerCreation = resolve;
+      });
+    }
+  };
+  vm.runInContext('appState.screenshotDataUrl = "data:image/png;base64,abc";', parser.context);
+  const ocrRun = vm.runInContext("runScreenshotOcr()", parser.context);
+  await new Promise(function (resolve) { setImmediate(resolve); });
+  assert.equal(typeof resolveWorkerCreation, "function");
+
+  vm.runInContext('clearScreenshotPreview("screenshot removed.")', parser.context);
+  resolveWorkerCreation({
+    terminate: async function () {
+      terminationCount += 1;
+    }
+  });
+  await Promise.all([
+    ocrRun,
+    vm.runInContext("screenshotOcrTermination", parser.context)
+  ]);
+
+  assert.equal(terminationCount, 1);
+  assert.equal(vm.runInContext("appState.screenshotDataUrl", parser.context), "");
+  assert.equal(vm.runInContext("activeScreenshotOcrRun", parser.context), null);
 });

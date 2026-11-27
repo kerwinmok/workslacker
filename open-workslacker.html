@@ -75,13 +75,22 @@
       const statusEl = document.getElementById("launch-status");
 
       async function probePort(port) {
-        const controller = typeof AbortController === "function" ? new AbortController() : null;
-        const timerId = controller ? setTimeout(function () { controller.abort(); }, 600) : null;
+        let controller = null;
+        if (typeof AbortController === "function") {
+          controller = new AbortController();
+        }
+        let timerId = null;
+        if (controller) {
+          timerId = setTimeout(function () { controller.abort(); }, 600);
+        }
         try {
-          const resp = await fetch("http://127.0.0.1:" + port + "/api/ping", {
+          const fetchOptions = {
             cache: "no-store",
-            signal: controller ? controller.signal : undefined
-          });
+          };
+          if (controller) {
+            fetchOptions.signal = controller.signal;
+          }
+          const resp = await fetch("http://127.0.0.1:" + port + "/api/ping", fetchOptions);
           if (!resp.ok) {
             return null;
           }

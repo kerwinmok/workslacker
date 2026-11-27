@@ -45,7 +45,8 @@ const DEFAULT_SERVICES = [
   { name: "Spark Plugs Replacement", category: "Maintenance" },
   { name: "Coolant Flush", category: "Maintenance" },
   { name: "12V Battery Replacement", category: "Electrical" },
-  { name: "Warning Light / Diagnostics", category: "Diagnostics" }
+  { name: "Warning Light / Diagnostics", category: "Diagnostics" },
+  { name: "Extended Warranty Inquiry", category: "Customer Concern" }
 ];
 
 const DEFAULT_CATEGORIES = ["Price Quote", "Oil Change", "Status Update", "Callback", "Maintenance", "Brakes", "Tires", "Diagnostics", "Electrical", "Customer Concern", "Other"];
@@ -174,9 +175,12 @@ const appState = {
   editingTemplateId: "",
   closeModalAfterTemplateSave: false,
   signature: DEFAULT_SIGNATURE,
-  screenshotDataUrl: "",
-  screenshotBlob: null
+  screenshotDataUrl: ""
 };
+
+let activeScreenshotFileReader = null;
+let activeScreenshotOcrRun = null;
+let screenshotOcrTermination = Promise.resolve();
 
 // check whether we are running from the local usb server
 function isLocalUsbServer() {
@@ -303,6 +307,24 @@ function loadSavedSettings() {
       // keep the bundled defaults
     }
   });
+  addMissingDefaultCustomerConcernServices();
+}
+
+function addMissingDefaultCustomerConcernServices() {
+  const defaultCustomerConcerns = DEFAULT_SERVICES.filter(function (service) {
+    return service.category === "Customer Concern";
+  });
+  if (!appState.categories.some(function (category) { return category.toLowerCase() === "customer concern"; })) {
+    appState.categories.push("Customer Concern");
+  }
+  defaultCustomerConcerns.forEach(function (defaultService) {
+    const alreadyExists = appState.services.some(function (service) {
+      return service.name.toLowerCase() === defaultService.name.toLowerCase();
+    });
+    if (!alreadyExists) {
+      appState.services.push(Object.assign({}, defaultService));
+    }
+  });
 }
 
 // select an advisor by index and populate the advisor name field
@@ -378,7 +400,11 @@ function removeAdvisorAtIndex(idx) {
   renderAdvisorPills();
   renderSettingsAdvisorList();
   updateEmailPreview();
-  showToast("removed advisor " + (removed ? removed.name : "") + ".");
+  let removedName = "";
+  if (removed) {
+    removedName = removed.name;
+  }
+  showToast("removed advisor " + removedName + ".");
 }
 
 function updateAdvisorNameAtIndex(idx, rawName) {
@@ -609,7 +635,11 @@ function updateSaveTemplateButtonLabel() {
   const btn = document.getElementById("save-template-btn");
   if (!btn) return;
   const active = getActiveTemplate();
-  btn.textContent = active ? ('save changes to "' + active.name + '"') : "save current email as template";
+  if (active) {
+    btn.textContent = 'save changes to "' + active.name + '"';
+  } else {
+    btn.textContent = "save current email as template";
+  }
 }
 
 function setActiveModeUi(mode) {
@@ -696,7 +726,11 @@ function renderSettingsTemplateList() {
     }]].forEach(function (action) {
       const button = document.createElement("button");
       button.type = "button";
-      button.className = action[0] === "delete" ? "btn btn-danger btn-small" : "btn btn-secondary btn-small";
+      if (action[0] === "delete") {
+        button.className = "btn btn-danger btn-small";
+      } else {
+        button.className = "btn btn-secondary btn-small";
+      }
       button.textContent = action[0];
       button.addEventListener("click", action[1]);
       actions.appendChild(button);
@@ -732,7 +766,10 @@ function renderSettingsServiceList() {
       const category = window.prompt("Category", service.category || "Other");
       service.name = name.trim();
       appState.selectedServices = appState.selectedServices.map(function (selected) {
-        return selected === previousName ? service.name : selected;
+        if (selected === previousName) {
+          return service.name;
+        }
+        return selected;
       });
       if (category && category.trim()) {
         service.category = category.trim();
@@ -782,7 +819,12 @@ function renderSettingsCategoryList() {
     edit.addEventListener("click", function () {
       const replacement = window.prompt("Category name", category);
       if (!replacement || !replacement.trim() || replacement.trim() === category) return;
-      appState.categories = appState.categories.map(function (item) { return item === category ? replacement.trim() : item; });
+      appState.categories = appState.categories.map(function (item) {
+        if (item === category) {
+          return replacement.trim();
+        }
+        return item;
+      });
       appState.categories = Array.from(new Set(appState.categories));
       appState.services.forEach(function (service) { if (service.category === category) service.category = replacement.trim(); });
       appState.templates.forEach(function (template) { if (template.category === category) template.category = replacement.trim(); });
@@ -829,18 +871,31 @@ function openTemplateEditor(template, options) {
   const editor = document.getElementById("template-editor");
   if (!editor) return;
   appState.closeModalAfterTemplateSave = Boolean(options && options.closeModalOnSave);
-  appState.editingTemplateId = template ? (template.id || "") : "";
+  appState.editingTemplateId = "";
+  if (template) {
+    appState.editingTemplateId = template.id || "";
+  }
   const saveAsNewBtn = document.getElementById("save-as-new-template-btn");
   if (saveAsNewBtn) {
     saveAsNewBtn.classList.toggle("hidden", appState.editingTemplateId === "");
   }
-  document.getElementById("template-name-input").value = template ? (template.name || "") : "";
+  document.getElementById("template-name-input").value = "";
+  if (template) {
+    document.getElementById("template-name-input").value = template.name || "";
+  }
   const modeSelect = document.getElementById("template-mode-input");
   if (modeSelect) {
-    modeSelect.value = template ? inferTemplateMode(template) : (appState.mode || "quote");
+    modeSelect.value = appState.mode || "quote";
+    if (template) {
+      modeSelect.value = inferTemplateMode(template);
+    }
   }
-  document.getElementById("template-subject-input").value = template ? (template.subject || "") : "";
-  document.getElementById("template-body-input").value = template ? (template.body || "") : "";
+  document.getElementById("template-subject-input").value = "";
+  document.getElementById("template-body-input").value = "";
+  if (template) {
+    document.getElementById("template-subject-input").value = template.subject || "";
+    document.getElementById("template-body-input").value = template.body || "";
+  }
   editor.classList.remove("hidden");
   if (typeof editor.scrollIntoView === "function") {
     editor.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -872,14 +927,20 @@ function makeReusableTemplateText(value, isSubject) {
   const custVinEl = document.getElementById("customer-vin");
   const advisorEl = document.getElementById("advisor-name-input");
 
-  const custNum = custNumEl ? custNumEl.value.trim() : "";
-  const custName = custNameEl ? custNameEl.value.trim() : "";
-  const custPhone = custPhoneEl ? custPhoneEl.value.trim() : "";
-  const rawVin = custVinEl ? custVinEl.value.trim() : "";
+  let custNum = "";
+  let custName = "";
+  let custPhone = "";
+  let rawVin = "";
+  if (custNumEl) custNum = custNumEl.value.trim();
+  if (custNameEl) custName = custNameEl.value.trim();
+  if (custPhoneEl) custPhone = custPhoneEl.value.trim();
+  if (custVinEl) rawVin = custVinEl.value.trim();
   const upperVin = rawVin.toUpperCase();
-  const advisorName = advisorEl ? advisorEl.value.trim() : "";
+  let advisorName = "";
+  if (advisorEl) advisorName = advisorEl.value.trim();
   const serviceText = getRequestedServicesText();
-  const sigText = appState.signature ? appState.signature.trim() : "";
+  let sigText = "";
+  if (appState.signature) sigText = appState.signature.trim();
 
   const values = [
     [custNum, "{{customerNumber}}"],
@@ -1002,7 +1063,10 @@ function updateEmailPreview() {
   }
 
   const serviceDetails = getRequestedServicesText();
-  const subjectCustomer = customerNumber !== "" ? (customerNumber + " " + customerName) : customerName;
+  let subjectCustomer = customerName;
+  if (customerNumber !== "") {
+    subjectCustomer = customerNumber + " " + customerName;
+  }
 
   let subjectLine = "";
   let openingLine = "";
@@ -1046,11 +1110,14 @@ function updateEmailPreview() {
   const activeTemplate = modeTemplates.find(function (template) { return template.id === appState.activeTemplateId; }) || modeTemplates[0] || null;
   if (activeTemplate && !appState.previewEdited) {
     appState.activeTemplateId = activeTemplate.id;
-    const signatureTrimmed = appState.signature ? appState.signature.trim() : "";
+    let signatureTrimmed = "";
+    if (appState.signature) {
+      signatureTrimmed = appState.signature.trim();
+    }
     const replacements = {
       customerName: customerName,
       customerNumber: customerNumber,
-      customerNumberLine: customerNumber ? "Customer #: " + customerNumber : "",
+      customerNumberLine: "",
       customerPhone: phoneNumber,
       vin: vinValue,
       advisorName: advisorName,
@@ -1058,6 +1125,9 @@ function updateEmailPreview() {
       customerAndNumber: subjectCustomer,
       signature: signatureTrimmed
     };
+    if (customerNumber) {
+      replacements.customerNumberLine = "Customer #: " + customerNumber;
+    }
     const fill = function (text) {
       const renderedLines = [];
       const rawLines = String(text || "").replace(/\r\n/g, "\n").split("\n");
@@ -1071,7 +1141,10 @@ function updateEmailPreview() {
           continue;
         }
         const replaced = line.replace(/{{\s*([a-zA-Z]+)\s*}}/g, function (match, key) {
-          return Object.prototype.hasOwnProperty.call(replacements, key) ? replacements[key] : match;
+          if (Object.prototype.hasOwnProperty.call(replacements, key)) {
+            return replacements[key];
+          }
+          return match;
         });
         renderedLines.push(replaced);
       }
@@ -1167,7 +1240,11 @@ function extractAndCleanVin(rawText) {
   while (labeledMatch !== null) {
     const rawCandidate = labeledMatch[1];
     const compactCandidate = rawCandidate.replace(/[^a-zA-Z0-9]/g, "");
-    const clean17 = normalizeVinCandidate(compactCandidate.length > 17 ? compactCandidate.slice(0, 17) : rawCandidate, false);
+    let vinCandidate = rawCandidate;
+    if (compactCandidate.length > 17) {
+      vinCandidate = compactCandidate.slice(0, 17);
+    }
+    const clean17 = normalizeVinCandidate(vinCandidate, false);
     if (clean17 !== "") {
       result.matchedTokens.push(rawCandidate);
       const prefix = clean17.slice(0, 3);
@@ -1551,7 +1628,10 @@ function findBestUnlabeledPersonName(rawBlock, scrubbedBlock, phoneInfo) {
     }
   }
 
-  return phoneAdjacentCandidate !== "" ? phoneAdjacentCandidate : firstCandidate;
+  if (phoneAdjacentCandidate !== "") {
+    return phoneAdjacentCandidate;
+  }
+  return firstCandidate;
 }
 
 function findBestUnlabeledCustomerNumber(rawText, customerName) {
@@ -1575,7 +1655,12 @@ function findBestUnlabeledCustomerNumber(rawText, customerName) {
       const cleanedNumber = cleanCustomerNumberToken(rawNumber);
       if (cleanedNumber !== "" && isAcceptableCustomerNumber(rawNumber, false)) {
         const explicitLabel = /\b(?:customer|cust|account|client)\b/i.test(line);
-        let score = explicitLabel ? 120 : (lineHasName ? 90 : 0);
+        let score = 0;
+        if (explicitLabel) {
+          score = 120;
+        } else if (lineHasName) {
+          score = 90;
+        }
 
         if (score === 0) {
           for (let adjacent = Math.max(0, i - 1); adjacent <= Math.min(lines.length - 1, i + 1); adjacent++) {
@@ -1602,7 +1687,10 @@ function findBestUnlabeledCustomerNumber(rawText, customerName) {
   candidates.sort(function (a, b) {
     return b.score - a.score || a.position - b.position;
   });
-  return candidates.length > 0 ? candidates[0].value : "";
+  if (candidates.length > 0) {
+    return candidates[0].value;
+  }
+  return "";
 }
 
 // pull out the vin, phone, customer #, and name from ocr or pasted tekion text
@@ -1758,11 +1846,28 @@ function handleScreenshotBlob(blob) {
   if (!blob) {
     return;
   }
-  appState.screenshotBlob = blob;
-
+  if (blob.size > MAX_SCREENSHOT_FILE_SIZE_BYTES) {
+    showToast("image is too large to scan. please use an image under 20 mb.");
+    return;
+  }
+  clearScreenshotPreview("loading screenshot...");
   const reader = new FileReader();
+  activeScreenshotFileReader = reader;
   reader.onload = function (event) {
-    appState.screenshotDataUrl = event.target.result;
+    if (activeScreenshotFileReader !== reader) {
+      return;
+    }
+    activeScreenshotFileReader = null;
+    reader.onload = null;
+    reader.onerror = null;
+    const dataUrl = event.target.result;
+    if (typeof dataUrl !== "string" || dataUrl === "") {
+      const statusText = document.getElementById("ocr-status-text");
+      if (statusText) statusText.textContent = "could not read screenshot. please try again.";
+      showToast("could not read screenshot. please try again.");
+      return;
+    }
+    appState.screenshotDataUrl = dataUrl;
     const imgEl = document.getElementById("screenshot-img");
     const previewWrap = document.getElementById("screenshot-preview-wrap");
     const placeholder = document.getElementById("paste-placeholder");
@@ -1791,7 +1896,30 @@ function handleScreenshotBlob(blob) {
     showToast("screenshot pasted - running auto-ocr...");
     runScreenshotOcr();
   };
-  reader.readAsDataURL(blob);
+  reader.onerror = function () {
+    if (activeScreenshotFileReader !== reader) {
+      return;
+    }
+    activeScreenshotFileReader = null;
+    reader.onload = null;
+    reader.onerror = null;
+    const statusText = document.getElementById("ocr-status-text");
+    if (statusText) statusText.textContent = "could not read screenshot. please try again.";
+    showToast("could not read screenshot. please try again.");
+  };
+  try {
+    reader.readAsDataURL(blob);
+  } catch (err) {
+    if (activeScreenshotFileReader === reader) {
+      activeScreenshotFileReader = null;
+    }
+    reader.onload = null;
+    reader.onerror = null;
+    console.error("Could not read screenshot image.", err);
+    const statusText = document.getElementById("ocr-status-text");
+    if (statusText) statusText.textContent = "could not read screenshot. please try again.";
+    showToast("could not read screenshot. please try again.");
+  }
 }
 
 // pad a canvas region with solid white borders so tesseract reads edge characters cleanly
@@ -1801,12 +1929,19 @@ function buildPaddedColumnDataUrl(sourceCanvas, startX, width, height, pad) {
   colCanvas.height = height + pad * 2;
   const colCtx = colCanvas.getContext("2d");
   if (!colCtx) {
+    colCanvas.width = 0;
+    colCanvas.height = 0;
     return "";
   }
-  colCtx.fillStyle = "#ffffff";
-  colCtx.fillRect(0, 0, colCanvas.width, colCanvas.height);
-  colCtx.drawImage(sourceCanvas, startX, 0, width, height, pad, pad, width, height);
-  return colCanvas.toDataURL("image/png");
+  try {
+    colCtx.fillStyle = "#ffffff";
+    colCtx.fillRect(0, 0, colCanvas.width, colCanvas.height);
+    colCtx.drawImage(sourceCanvas, startX, 0, width, height, pad, pad, width, height);
+    return colCanvas.toDataURL("image/png");
+  } finally {
+    colCanvas.width = 0;
+    colCanvas.height = 0;
+  }
 }
 
 // detect full-height gray vertical divider lines inside wide short banners
@@ -1839,11 +1974,17 @@ function detectVerticalBannerDividers(rawGray, width, height, scale) {
   return dividers;
 }
 
+const MAX_OCR_PIXEL_COUNT = 4000000;
+const MAX_SCREENSHOT_FILE_SIZE_BYTES = 20 * 1024 * 1024;
+
 // upscale small tekion snips, pad edges, split wide banners into columns, and boost contrast gently
 function preprocessImageForOcr(dataUrl) {
-  return new Promise(function (resolve) {
+  return new Promise(function (resolve, reject) {
     const img = new Image();
     img.onload = function () {
+      let workCanvas = null;
+      let paddedCanvas = null;
+      let rawGray = null;
       try {
         let scale = 1;
         if (img.height < 120) {
@@ -1854,17 +1995,18 @@ function preprocessImageForOcr(dataUrl) {
           scale = 2;
         }
 
-        const scaledW = img.width * scale;
-        const scaledH = img.height * scale;
+        const pixelLimitScale = Math.sqrt(MAX_OCR_PIXEL_COUNT / (img.width * img.height));
+        scale = Math.min(scale, pixelLimitScale);
+        const scaledW = Math.max(1, Math.floor(img.width * scale));
+        const scaledH = Math.max(1, Math.floor(img.height * scale));
         const pad = 24;
 
-        const workCanvas = document.createElement("canvas");
+        workCanvas = document.createElement("canvas");
         workCanvas.width = scaledW;
         workCanvas.height = scaledH;
         const workCtx = workCanvas.getContext("2d");
         if (!workCtx) {
-          resolve({ fullDataUrl: dataUrl, columnDataUrls: [] });
-          return;
+          throw new Error("could not create image canvas for OCR");
         }
         workCtx.imageSmoothingEnabled = true;
         workCtx.imageSmoothingQuality = "high";
@@ -1873,7 +2015,7 @@ function preprocessImageForOcr(dataUrl) {
         const imageData = workCtx.getImageData(0, 0, scaledW, scaledH);
         const data = imageData.data;
         const pixelCount = data.length / 4;
-        const rawGray = new Float32Array(pixelCount);
+        rawGray = new Float32Array(pixelCount);
 
         let brightnessTotal = 0;
         for (let p = 0; p < pixelCount; p++) {
@@ -1918,9 +2060,12 @@ function preprocessImageForOcr(dataUrl) {
         // stretch the screenshot's useful tonal range so selected and low-contrast text stays readable
         for (let p = 0; p < pixelCount; p++) {
           const i = p * 4;
-          let contrasted = contrastRange >= 32
-            ? (rawGray[p] - lowGray) * 255 / contrastRange
-            : (rawGray[p] - 128) * 1.32 + 128;
+          let contrasted;
+          if (contrastRange >= 32) {
+            contrasted = (rawGray[p] - lowGray) * 255 / contrastRange;
+          } else {
+            contrasted = (rawGray[p] - 128) * 1.32 + 128;
+          }
           if (contrasted < 0) {
             contrasted = 0;
           }
@@ -1933,7 +2078,7 @@ function preprocessImageForOcr(dataUrl) {
         }
         workCtx.putImageData(imageData, 0, 0);
 
-        const paddedCanvas = document.createElement("canvas");
+        paddedCanvas = document.createElement("canvas");
         paddedCanvas.width = scaledW + pad * 2;
         paddedCanvas.height = scaledH + pad * 2;
         const paddedCtx = paddedCanvas.getContext("2d");
@@ -1952,8 +2097,10 @@ function preprocessImageForOcr(dataUrl) {
           const bounds = [0].concat(dividers, [scaledW]);
           const trimEdge = 4 * scale;
           for (let b = 0; b < bounds.length - 1; b++) {
-            const left = bounds[b] + (b === 0 ? 0 : trimEdge);
-            const right = bounds[b + 1] - (b === bounds.length - 2 ? 0 : trimEdge);
+            let left = bounds[b] + trimEdge;
+            let right = bounds[b + 1] - trimEdge;
+            if (b === 0) left = bounds[b];
+            if (b === bounds.length - 2) right = bounds[b + 1];
             const sliceW = right - left;
             if (sliceW >= 60 * scale) {
               const colUrl = buildPaddedColumnDataUrl(workCanvas, left, sliceW, scaledH, pad);
@@ -1964,16 +2111,36 @@ function preprocessImageForOcr(dataUrl) {
           }
         }
 
-        resolve({
+        const result = {
           fullDataUrl: fullDataUrl,
-          columnDataUrls: columnDataUrls.length >= 2 ? columnDataUrls : []
-        });
+          columnDataUrls: []
+        };
+        if (columnDataUrls.length >= 2) {
+          result.columnDataUrls = columnDataUrls;
+        }
+        resolve(result);
       } catch (err) {
-        resolve({ fullDataUrl: dataUrl, columnDataUrls: [] });
+        reject(err);
+      } finally {
+        rawGray = null;
+        if (workCanvas) {
+          workCanvas.width = 0;
+          workCanvas.height = 0;
+        }
+        if (paddedCanvas) {
+          paddedCanvas.width = 0;
+          paddedCanvas.height = 0;
+        }
+        img.onload = null;
+        img.onerror = null;
+        img.src = "";
       }
     };
     img.onerror = function () {
-      resolve({ fullDataUrl: dataUrl, columnDataUrls: [] });
+      img.onload = null;
+      img.onerror = null;
+      img.src = "";
+      reject(new Error("could not load screenshot for OCR"));
     };
     img.src = dataUrl;
   });
@@ -2030,7 +2197,10 @@ function extractStructuredTextFromOcrData(data) {
       let lineStr = "";
       for (let w = 0; w < line.words.length; w++) {
         const word = line.words[w];
-        const wordText = word && word.text ? String(word.text).trim() : "";
+        let wordText = "";
+        if (word && word.text) {
+          wordText = String(word.text).trim();
+        }
         if (wordText === "") {
           continue;
         }
@@ -2039,8 +2209,15 @@ function extractStructuredTextFromOcrData(data) {
         } else {
           const prev = line.words[w - 1];
           const hasBoxes = prev && prev.bbox && word.bbox && typeof prev.bbox.x1 === "number" && typeof word.bbox.x0 === "number";
-          const gap = hasBoxes ? (word.bbox.x0 - prev.bbox.x1) : 0;
-          lineStr = lineStr + (gap > gapThreshold ? " | " : " ") + wordText;
+          let gap = 0;
+          if (hasBoxes) {
+            gap = word.bbox.x0 - prev.bbox.x1;
+          }
+          if (gap > gapThreshold) {
+            lineStr = lineStr + " | " + wordText;
+          } else {
+            lineStr = lineStr + " " + wordText;
+          }
         }
       }
       if (lineStr !== "") {
@@ -2071,19 +2248,64 @@ function cleanOcrText(rawText) {
 }
 
 // run tesseract ocr on my screenshot to auto-fill the form
+function terminateScreenshotOcrWorker(run) {
+  if (!run.worker && !run.workerCreationPromise) {
+    return Promise.resolve();
+  }
+  if (!run.terminationPromise) {
+    if (run.worker) {
+      run.terminationPromise = Promise.resolve()
+        .then(function () { return run.worker.terminate(); });
+    } else {
+      run.terminationPromise = run.workerCreationPromise.then(
+        function (worker) {
+          run.worker = worker;
+          return worker.terminate();
+        },
+        function () {}
+      );
+    }
+    run.terminationPromise = run.terminationPromise.catch(function (err) {
+      console.error("Could not stop the OCR worker.", err);
+    });
+    screenshotOcrTermination = run.terminationPromise;
+  }
+  return run.terminationPromise;
+}
+
+function cancelScreenshotOcr() {
+  const run = activeScreenshotOcrRun;
+  activeScreenshotOcrRun = null;
+  if (!run) {
+    return screenshotOcrTermination;
+  }
+  run.cancelled = true;
+  return terminateScreenshotOcrWorker(run);
+}
+
 async function runScreenshotOcr() {
   if (!appState.screenshotDataUrl) {
     showToast("paste a screenshot first before running ocr.");
     return;
   }
 
+  const screenshotDataUrl = appState.screenshotDataUrl;
   const statusText = document.getElementById("ocr-status-text");
   const ocrBtn = document.getElementById("run-ocr-btn");
+  const previousTermination = cancelScreenshotOcr();
+  const run = {
+    worker: null,
+    workerCreationPromise: null,
+    terminationPromise: null,
+    cancelled: false
+  };
+  activeScreenshotOcrRun = run;
 
   if (!window.Tesseract) {
     if (statusText) {
       statusText.textContent = "tesseract library is not available offline. use quick text parser below.";
     }
+    activeScreenshotOcrRun = null;
     return;
   }
 
@@ -2094,35 +2316,46 @@ async function runScreenshotOcr() {
     statusText.textContent = "scanning screenshot with ocr... please wait a moment.";
   }
 
-  let worker = null;
   try {
-    const prep = await preprocessImageForOcr(appState.screenshotDataUrl);
-    let combinedText = "";
-    let preferredNameText = "";
+    await previousTermination;
+    if (activeScreenshotOcrRun !== run) return;
 
-    const ocrImages = prep.columnDataUrls.length >= 2
-      ? prep.columnDataUrls
-      : [prep.fullDataUrl];
+    const prep = await preprocessImageForOcr(screenshotDataUrl);
+    if (activeScreenshotOcrRun !== run) return;
+
+    let ocrImages = [prep.fullDataUrl];
+    if (prep.columnDataUrls.length >= 2) {
+      ocrImages = prep.columnDataUrls;
+    }
     if (typeof window.Tesseract.createWorker === "function") {
-      worker = await window.Tesseract.createWorker("eng");
+      run.workerCreationPromise = window.Tesseract.createWorker("eng");
+      run.worker = await run.workerCreationPromise;
+      if (activeScreenshotOcrRun !== run) return;
     }
 
     const recognizedTexts = [];
     for (let i = 0; i < ocrImages.length; i++) {
-      if (worker && typeof worker.setParameters === "function") {
-        await worker.setParameters({ tessedit_pageseg_mode: "6", preserve_interword_spaces: "1" });
+      if (run.worker && typeof run.worker.setParameters === "function") {
+        await run.worker.setParameters({ tessedit_pageseg_mode: "6", preserve_interword_spaces: "1" });
+        if (activeScreenshotOcrRun !== run) return;
       }
-      const standardResult = worker
-        ? await worker.recognize(ocrImages[i])
-        : await window.Tesseract.recognize(ocrImages[i], "eng");
+      let standardResult;
+      if (run.worker) {
+        standardResult = await run.worker.recognize(ocrImages[i]);
+      } else {
+        standardResult = await window.Tesseract.recognize(ocrImages[i], "eng");
+      }
+      if (activeScreenshotOcrRun !== run) return;
       const standardText = extractStructuredTextFromOcrData(standardResult.data);
       if (standardText !== "") {
         recognizedTexts.push(standardText);
       }
 
-      if (worker && typeof worker.setParameters === "function") {
-        await worker.setParameters({ tessedit_pageseg_mode: "11", preserve_interword_spaces: "1" });
-        const sparseResult = await worker.recognize(ocrImages[i]);
+      if (run.worker && typeof run.worker.setParameters === "function") {
+        await run.worker.setParameters({ tessedit_pageseg_mode: "11", preserve_interword_spaces: "1" });
+        if (activeScreenshotOcrRun !== run) return;
+        const sparseResult = await run.worker.recognize(ocrImages[i]);
+        if (activeScreenshotOcrRun !== run) return;
         const sparseText = extractStructuredTextFromOcrData(sparseResult.data);
         if (sparseText !== "") {
           recognizedTexts.push(sparseText);
@@ -2133,26 +2366,27 @@ async function runScreenshotOcr() {
         preferredNameText = recognizedTexts.slice(-2).join("\n");
       }
     }
-    combinedText = cleanOcrText(recognizedTexts.join("\n"));
+    const combinedText = cleanOcrText(recognizedTexts.join("\n"));
 
+    if (activeScreenshotOcrRun !== run) return;
     parseTekionOrAwpText(combinedText, { clearPrevious: true, preferredNameText: preferredNameText });
     if (statusText) {
       statusText.setAttribute("data-last-ocr", combinedText.slice(0, 600));
       statusText.textContent = "ocr done — verify fields below.";
     }
   } catch (err) {
-    if (statusText) {
+    if (activeScreenshotOcrRun === run && statusText) {
       statusText.textContent = "ocr scan encountered an error. you can still copy the screenshot with your email.";
     }
-  } finally {
-    if (worker && typeof worker.terminate === "function") {
-      try {
-        await worker.terminate();
-      } catch (terminateErr) {
-        // ignore cleanup errors
-      }
+    if (activeScreenshotOcrRun === run) {
+      console.error("OCR scan failed.", err);
     }
-    if (ocrBtn) {
+  } finally {
+    await terminateScreenshotOcrWorker(run);
+    if (activeScreenshotOcrRun === run) {
+      activeScreenshotOcrRun = null;
+    }
+    if (activeScreenshotOcrRun === null && !run.cancelled && ocrBtn) {
       ocrBtn.disabled = false;
     }
   }
@@ -2205,15 +2439,29 @@ async function copyRichEmailWithScreenshot() {
 
 // reset the screenshot box and action buttons
 function clearScreenshotPreview(statusMessage) {
+  const reader = activeScreenshotFileReader;
+  activeScreenshotFileReader = null;
+  if (reader) {
+    reader.onload = null;
+    reader.onerror = null;
+    reader.onabort = null;
+    if (reader.readyState === FileReader.LOADING) {
+      reader.abort();
+    }
+  }
+  cancelScreenshotOcr();
   appState.screenshotDataUrl = "";
-  appState.screenshotBlob = null;
   const imgEl = document.getElementById("screenshot-img");
   const previewWrap = document.getElementById("screenshot-preview-wrap");
   const placeholder = document.getElementById("paste-placeholder");
   const ocrBtn = document.getElementById("run-ocr-btn");
   const clearBtn = document.getElementById("clear-screenshot-btn");
+  const fileInput = document.getElementById("file-upload-input");
   const statusText = document.getElementById("ocr-status-text");
 
+  if (fileInput) {
+    fileInput.value = "";
+  }
   if (imgEl) {
     imgEl.src = "";
   }
@@ -2293,7 +2541,10 @@ function initializeDashboardEvents() {
       const nextMode = modeButtons[i].getAttribute("data-mode");
       setActiveModeUi(nextMode);
       const modeTemplates = getTemplatesForMode(nextMode);
-      appState.activeTemplateId = modeTemplates.length > 0 ? modeTemplates[0].id : "";
+      appState.activeTemplateId = "";
+      if (modeTemplates.length > 0) {
+        appState.activeTemplateId = modeTemplates[0].id;
+      }
       appState.previewEdited = false;
       renderTemplateVariationPills();
       updateEmailPreview();
@@ -2328,13 +2579,19 @@ function initializeDashboardEvents() {
   const saveTemplateBtn = document.getElementById("save-template-btn");
   if (saveTemplateBtn) saveTemplateBtn.addEventListener("click", function () {
     const active = getActiveTemplate();
-    openTemplateEditor({
-      id: active ? active.id : "",
-      mode: active ? inferTemplateMode(active) : appState.mode,
-      name: active ? active.name : "",
+    const template = {
+      id: "",
+      mode: appState.mode,
+      name: "",
       subject: makeReusableTemplateText(document.getElementById("preview-subject").value, true),
       body: makeReusableTemplateText(document.getElementById("preview-body").value, false)
-    }, { closeModalOnSave: true });
+    };
+    if (active) {
+      template.id = active.id;
+      template.mode = inferTemplateMode(active);
+      template.name = active.name;
+    }
+    openTemplateEditor(template, { closeModalOnSave: true });
   });
   const newTemplateBtn = document.getElementById("new-template-btn");
   if (newTemplateBtn) newTemplateBtn.addEventListener("click", function () {
@@ -2349,18 +2606,25 @@ function initializeDashboardEvents() {
     const name = document.getElementById("template-name-input").value.trim();
     if (!name) { showToast("enter a template name."); return; }
     const modeSelect = document.getElementById("template-mode-input");
-    const mode = modeSelect ? modeSelect.value : (appState.mode || "quote");
+    let mode = appState.mode || "quote";
+    if (modeSelect) {
+      mode = modeSelect.value;
+    }
     const useExistingId = !forceNew && appState.editingTemplateId;
     const template = {
-      id: useExistingId ? appState.editingTemplateId : ("template-" + Date.now()),
+      id: "template-" + Date.now(),
       mode: mode,
       name: name,
       subject: document.getElementById("template-subject-input").value,
       body: document.getElementById("template-body-input").value
     };
-    const existing = useExistingId
-      ? appState.templates.findIndex(function (item) { return item.id === template.id; })
-      : -1;
+    if (useExistingId) {
+      template.id = appState.editingTemplateId;
+    }
+    let existing = -1;
+    if (useExistingId) {
+      existing = appState.templates.findIndex(function (item) { return item.id === template.id; });
+    }
     if (existing === -1) appState.templates.push(template);
     else appState.templates[existing] = template;
     setActiveModeUi(mode);
