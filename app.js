@@ -56,63 +56,63 @@ const DEFAULT_TEMPLATES = [
     mode: "quote",
     name: "Standard Quote",
     subject: "PRICE QUOTE: {{customerAndNumber}}",
-    body: "Hello {{advisorName}},\n\nCould you please provide a price quote for the request below?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nProblem / Service: {{serviceDetails}}\n\n{{signature}}"
+    body: "Hello {{advisorName}},\n\nCould you please provide a price quote for the request below?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nCustomer Concerns: {{serviceDetails}}\n\n{{signature}}"
   },
   {
     id: "quote-maintenance",
     mode: "quote",
     name: "Oil / Maintenance",
     subject: "PRICE QUOTE: {{customerAndNumber}}",
-    body: "Hello {{advisorName}},\n\nCould you please provide a price quote and availability for the maintenance service below?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nProblem / Service: {{serviceDetails}}\n\n{{signature}}"
+    body: "Hello {{advisorName}},\n\nCould you please provide a price quote and availability for the maintenance service below?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nCustomer Concerns: {{serviceDetails}}\n\n{{signature}}"
   },
   {
     id: "quote-brakes-tires",
     mode: "quote",
     name: "Brakes / Tires",
     subject: "PRICE QUOTE: {{customerAndNumber}}",
-    body: "Hello {{advisorName}},\n\nCould you please provide a parts and labor quote for the brake/tire request below?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nProblem / Service: {{serviceDetails}}\n\n{{signature}}"
+    body: "Hello {{advisorName}},\n\nCould you please provide a parts and labor quote for the brake/tire request below?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nCustomer Concerns: {{serviceDetails}}\n\n{{signature}}"
   },
   {
     id: "status-general",
     mode: "status",
     name: "General Status",
     subject: "STATUS UPDATE: {{customerAndNumber}}",
-    body: "Hello {{advisorName}},\n\nCould you please provide a status update for the customer below?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nProblem / Service: {{serviceDetails}}\n\n{{signature}}"
+    body: "Hello {{advisorName}},\n\nCould you please provide a status update for the customer below?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nCustomer Concerns: {{serviceDetails}}\n\n{{signature}}"
   },
   {
     id: "status-ready",
     mode: "status",
     name: "Ready for Pickup?",
     subject: "STATUS UPDATE: {{customerAndNumber}}",
-    body: "Hello {{advisorName}},\n\nThe customer below called to check if their vehicle is ready for pickup. Could you please provide an update?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nProblem / Service: {{serviceDetails}}\n\n{{signature}}"
+    body: "Hello {{advisorName}},\n\nThe customer below called to check if their vehicle is ready for pickup. Could you please provide an update?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nCustomer Concerns: {{serviceDetails}}\n\n{{signature}}"
   },
   {
     id: "status-eta",
     mode: "status",
     name: "Parts / Repair ETA",
     subject: "STATUS UPDATE: {{customerAndNumber}}",
-    body: "Hello {{advisorName}},\n\nThe customer below is asking for an updated ETA on parts/repairs. Could you please advise?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nProblem / Service: {{serviceDetails}}\n\n{{signature}}"
+    body: "Hello {{advisorName}},\n\nThe customer below is asking for an updated ETA on parts/repairs. Could you please advise?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nCustomer Concerns: {{serviceDetails}}\n\n{{signature}}"
   },
   {
     id: "callback-standard",
     mode: "callback",
     name: "Standard Callback",
     subject: "CALLBACK: {{customerAndNumber}}",
-    body: "Hello {{advisorName}},\n\nCould you please give the customer below a call back?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nProblem / Service: {{serviceDetails}}\n\n{{signature}}"
+    body: "Hello {{advisorName}},\n\nCould you please give the customer below a call back?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nCustomer Concerns: {{serviceDetails}}\n\n{{signature}}"
   },
   {
     id: "callback-urgent",
     mode: "callback",
     name: "Urgent Callback",
     subject: "CALLBACK: {{customerAndNumber}}",
-    body: "Hello {{advisorName}},\n\nThe customer below requested a callback as soon as possible regarding the issue below.\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nProblem / Service: {{serviceDetails}}\n\n{{signature}}"
+    body: "Hello {{advisorName}},\n\nThe customer below requested a callback as soon as possible regarding the issue below.\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nCustomer Concerns: {{serviceDetails}}\n\n{{signature}}"
   },
   {
     id: "callback-booking",
     mode: "callback",
     name: "Follow-Up / Booking",
     subject: "CALLBACK: {{customerAndNumber}}",
-    body: "Hello {{advisorName}},\n\nCould you please call the customer below back to follow up or schedule their appointment?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nProblem / Service: {{serviceDetails}}\n\n{{signature}}"
+    body: "Hello {{advisorName}},\n\nCould you please call the customer below back to follow up or schedule their appointment?\n\nCustomer Name: {{customerName}}\n{{customerNumberLine}}\nPhone Number: {{customerPhone}}\nVIN: {{vin}}\nCustomer Concerns: {{serviceDetails}}\n\n{{signature}}"
   }
 ];
 
@@ -147,7 +147,8 @@ function normalizeLoadedTemplates(list) {
   return list.filter(function (item) {
     return item && typeof item.id === "string" && typeof item.name === "string" && typeof item.subject === "string" && typeof item.body === "string";
   }).map(function (item) {
-    return Object.assign({}, item, { mode: inferTemplateMode(item) });
+    const body = item.body.replace(/^([ \t]*)Problem\s*\/\s*Service[ \t]*:/gim, "$1Customer Concerns:");
+    return Object.assign({}, item, { mode: inferTemplateMode(item), body: body });
   });
 }
 
@@ -926,7 +927,7 @@ function makeReusableTemplateText(value, isSubject) {
     .replace(/^([ \t]*Customer\s*#:[ \t]*).+$/m, "{{customerNumberLine}}")
     .replace(/^([ \t]*Phone\s+Number:[ \t]*).+$/m, "$1{{customerPhone}}")
     .replace(/^([ \t]*VIN:[ \t]*).+$/m, "$1{{vin}}")
-    .replace(/^([ \t]*Problem\s*\/\s*Service:[ \t]*).+$/m, "$1{{serviceDetails}}");
+    .replace(/^([ \t]*)(?:Problem\s*\/\s*Service|Customer Concerns):[ \t]*.+$/im, "$1Customer Concerns: {{serviceDetails}}");
 
   // keep customerNumberLine under Customer Name if the active email didn't have a customer # yet
   if (reusable.indexOf("{{customerNumberLine}}") === -1 && /^([ \t]*Customer\s+Name:[ \t]*\{\{customerName\}\})$/m.test(reusable)) {
@@ -959,7 +960,7 @@ function getRequestedServicesText() {
 
   if (combined.length === 0) {
     if (appState.mode === "quote") {
-      return "[problem / requested service]";
+      return "[customer concerns]";
     }
     return "[details / inquiry]";
   }
@@ -1031,7 +1032,7 @@ function updateEmailPreview() {
 
   bodyLines.push("Phone Number: " + phoneNumber);
   bodyLines.push("VIN: " + vinValue);
-  bodyLines.push("Problem / Service: " + serviceDetails);
+  bodyLines.push("Customer Concerns: " + serviceDetails);
   if (appState.signature && appState.signature.trim() !== "") {
     bodyLines.push("");
     bodyLines.push(appState.signature);

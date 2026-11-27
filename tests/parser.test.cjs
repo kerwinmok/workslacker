@@ -117,3 +117,19 @@ test("advisor names can be changed without allowing duplicates", function () {
   assert.equal(vm.runInContext('updateAdvisorNameAtIndex(0, "John Smith")', parser.context), false);
   assert.equal(vm.runInContext("appState.advisors[0].name", parser.context), "Jane Brown");
 });
+
+test("all built-in and previously saved templates use the customer concerns label", function () {
+  const parser = createParserContext();
+  const bodies = vm.runInContext("DEFAULT_TEMPLATES.map(function (template) { return template.body; })", parser.context);
+  assert.equal(bodies.length, 9);
+  bodies.forEach(function (body) {
+    assert.match(body, /Customer Concerns: \{\{serviceDetails\}\}/);
+    assert.doesNotMatch(body, /Problem\s*\/\s*Service:/i);
+  });
+
+  const migrated = vm.runInContext(
+    'normalizeLoadedTemplates([{ id: "saved", name: "Saved", subject: "Subject", body: "Problem / Service: {{serviceDetails}}" }])[0].body',
+    parser.context
+  );
+  assert.equal(migrated, "Customer Concerns: {{serviceDetails}}");
+});
