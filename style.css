@@ -544,11 +544,17 @@ textarea:focus {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 0.4rem;
   padding: 0.42rem 0.6rem;
   background-color: var(--bg-input);
   border: 1px solid var(--border-color);
   border-radius: 6px;
   font-size: 0.84rem;
+}
+
+.advisor-row-item input {
+  flex: 1;
+  min-width: 0;
 }
 
 select:focus, input:focus, textarea:focus { outline: none; border-color: var(--bmw-blue); }

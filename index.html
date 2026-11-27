@@ -138,7 +138,10 @@
         </div>
 
         <div class="field-group">
-          <label>service advisor</label>
+          <div class="template-section-header">
+            <label>service advisor</label>
+            <button type="button" id="edit-advisors-btn" class="btn btn-secondary btn-small">edit advisors</button>
+          </div>
           <div id="advisor-pills" class="chip-container"></div>
           <div class="input-with-action">
             <input type="text" id="advisor-name-input" placeholder="type advisor name or add new..." autocomplete="off" />
@@ -276,7 +279,7 @@
 
         <hr class="divider" />
 
-        <div class="field-group">
+        <div class="field-group" id="settings-advisors-section">
           <label>saved service advisors (advisors.json)</label>
           <div id="settings-advisor-list" class="settings-advisor-list"></div>
 
